@@ -1,0 +1,82 @@
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    max_build_duration: 120
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - app_store_credentials
+      vars:
+        APP_ID: 1234567890  # App Store Connect App ID (설정 필요)
+        BUNDLE_ID: com.scc.sccApp.dev
+    scripts:
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Flutter build ipa
+        script: |
+          flutter build ipa --release \
+            --build-name=1.0.0 \
+            --build-number=$(($(app-store-connect get-latest-build-number "$APP_ID") + 1))
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com  # 이메일 주소 변경 필요
+        notify:
+          success: true
+          failure: false
+      app_store_connect:
+        auth: integration
+        
+        # App Store Connect API Key 설정 필요
+        # Settings → Code signing → App Store Connect API Key 추가
+        submit_to_testflight: false  # TestFlight 자동 업로드 (선택사항)
+        beta_groups:  # TestFlight 베타 그룹 (선택사항)
+          - group name 1
+          - group name 2
+
+  android-workflow:
+    name: Android Workflow
+    max_build_duration: 120
+    instance_type: linux_x2
+    environment:
+      flutter: stable
+      groups:
+        - keystore_credentials
+    scripts:
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Flutter build apk
+        script: |
+          flutter build apk --release \
+            --build-name=1.0.0 \
+            --build-number=$(($(google-play get-latest-build-number --package-name com.scc.scc_app) + 1))
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+      - build/app/outputs/bundle/**/*.aab
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com  # 이메일 주소 변경 필요
+        notify:
+          success: true
+          failure: false
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: alpha  # alpha, beta, production 중 선택
+        submit_as_draft: false
+
+
+
+

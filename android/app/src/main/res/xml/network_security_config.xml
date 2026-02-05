@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 개발 및 운영 환경: 공인 IP 및 로컬 네트워크 HTTP 허용 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">221.160.134.10</domain>
+        <domain includeSubdomains="true">192.168.0.7</domain>
+        <domain includeSubdomains="true">192.168.0.75</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+    
+    <!-- 모든 IP 주소 허용 (개발용) -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+

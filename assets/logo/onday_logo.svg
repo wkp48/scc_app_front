@@ -1,0 +1,72 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <!-- 배경 -->
+  <rect width="400" height="400" fill="#ffffff"/>
+  
+  <!-- 폰트 및 그라데이션 정의 -->
+  <defs>
+    <style type="text/css">
+      @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&amp;display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@700&amp;display=swap');
+    </style>
+  
+    <linearGradient id="trackGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#E8E8E8;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1FB5BA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1FB5BA;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="thumbGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF8B5A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F57242;stop-opacity:1" />
+    </linearGradient>
+    
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  
+  <!-- 슬라이드 트랙 배경 -->
+  <rect x="110" y="100" width="180" height="70" rx="35" fill="url(#trackGradient)"/>
+  
+  <!-- OFF 라벨 (왼쪽) -->
+  <text x="150" y="142" font-family="'Arial', sans-serif" font-size="20" font-weight="700" fill="#999999" text-anchor="middle" opacity="1">
+    <animate attributeName="opacity" values="1;0.3" dur="1.8s" repeatCount="1" fill="freeze"/>
+    OFF
+  </text>
+  
+  <!-- ON 라벨 (오른쪽 배경) -->
+  <text x="250" y="142" font-family="'Arial', sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">
+    ON
+  </text>
+  
+  <!-- 슬라이드 썸 (이동하는 원형 버튼) -->
+  <circle cx="250" cy="135" r="40" fill="url(#thumbGradient)" filter="url(#shadow)">
+    <animate attributeName="cx" values="150;250" dur="1.8s" repeatCount="1" fill="freeze"/>
+  </circle>
+  
+  <!-- ON 라벨 (썸 위에 표시) -->
+  <text x="250" y="142" font-family="'Arial', sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle" opacity="0">
+    <animate attributeName="opacity" values="0;0;1" dur="1.8s" repeatCount="1" fill="freeze"/>
+    ON
+  </text>
+  
+  <!-- ON : DAY 텍스트 -->
+  <text x="200" y="240" text-anchor="middle" font-family="'Arial Black', 'Helvetica', sans-serif" font-size="56" font-weight="900" letter-spacing="2" opacity="0">
+    <animate attributeName="opacity" values="0;0;0;1" dur="2.5s" repeatCount="1" fill="freeze"/>
+    <tspan fill="#4A4A4A">ON</tspan><tspan fill="#4A4A4A" font-weight="300" font-size="48" dy="-8">:</tspan><tspan fill="#4A4A4A" dy="8">DAY</tspan>
+  </text>
+  
+  <!-- 서브 텍스트 -->
+  <text x="200" y="278" text-anchor="middle" letter-spacing="1" opacity="0">
+    <animate attributeName="opacity" values="0;0;0;0;1" dur="3s" repeatCount="1" fill="freeze"/>
+    <tspan font-family="'Gaegu', cursive" font-size="20" font-weight="700" fill="#6B7280">일상으로 다시, </tspan>
+    <tspan font-family="'Gaegu', cursive" font-size="24" font-weight="700" fill="#6B7280">온</tspan>
+  </text>
+  
+  <!-- 활성화 글로우 효과 (반복) -->
+  <circle cx="250" cy="135" r="40" fill="none" stroke="#FF8B5A" stroke-width="2" opacity="0">
+    <animate attributeName="r" values="40;50;40" dur="2s" begin="1.8s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;0.5;0" dur="2s" begin="1.8s" repeatCount="indefinite"/>
+    <animate attributeName="cx" values="150;250" dur="1.8s" repeatCount="1" fill="freeze"/>
+  </circle>
+</svg>
