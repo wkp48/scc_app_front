@@ -425,6 +425,7 @@ class CalendarScreenState extends State<CalendarScreen> with SingleTickerProvide
                             children: [
                               // [Added] 날짜별 체크리스트 / 나의 현재 상태
                               DailyChecklistCard(
+                                key: ValueKey(_refreshCount),
                                 userData: widget.userData!,
                                 targetDate: DateFormat('yyyy-MM-dd').format(_selectedDay),
                                 customTitle: '나의 현재 상태',

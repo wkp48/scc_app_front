@@ -642,7 +642,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 hideFeedback: true, 
                 showRecoveryTrend: true, // [Added] 회복 변화 그래프 표시
                 onChecklistCompleted: () {
-                  setState(() {}); 
+                  _fetchDashboardData(); 
                 },
               ),
               const SizedBox(height: 24),

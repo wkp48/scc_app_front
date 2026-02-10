@@ -17,13 +17,29 @@ void _debugLog(String message) {
 class ApiService {
   static const bool isOfflineMode = false; // 백엔드 점검/오프라인 모드 활성화
 
+  static String? _cachedBaseUrl;
+
   static Future<String> get baseUrl async {
-    // 맥미니 서버 공인 IP 주소 (외부 접속용)
-    return 'http://115.20.138.8:8900/api';
-    // ngrok HTTPS 주소 (사용 안 함)
-    // return 'https://interrepellent-floretta-incorrigibly.ngrok-free.dev/api';
-    // 내부망 IP (내부 접속용)
-    // return 'http://192.168.0.75:8900/api';
+    if (_cachedBaseUrl != null) return _cachedBaseUrl!;
+
+    const publicUrl = 'http://39.123.252.131:8900/api';
+    const localUrl = 'http://192.168.45.99:8900/api';
+
+    try {
+      // 1. 내부망(Local) 연결 테스트 (짧은 타임아웃)
+      // 앱 버전 체크 API를 가볍게 찔러봅니다.
+      await http.get(Uri.parse('$localUrl/app/version/check?os=android'))
+          .timeout(const Duration(milliseconds: 1000));
+      
+      _debugLog('=== [Network] Local Network Detected: $localUrl ===');
+      _cachedBaseUrl = localUrl;
+      return localUrl;
+    } catch (e) {
+      // 2. 실패 시 외부망(Public) 사용
+      _debugLog('=== [Network] Fallback to Public Network: $publicUrl ===');
+      _cachedBaseUrl = publicUrl;
+      return publicUrl;
+    }
   }
   
   // 회원 탈퇴
