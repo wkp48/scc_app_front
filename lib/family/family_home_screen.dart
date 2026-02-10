@@ -306,6 +306,8 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
               checklistType: 'FAMILY',
               customTitle: '나의 성장 상태',
               hideLeftBorder: true,
+              showRecoveryTrend: true,
+              hideExpandButton: true,
             ),
             const SizedBox(height: 24),
             _buildQuickAccessGrid(),

@@ -17,6 +17,7 @@ class DailyChecklistCard extends StatefulWidget {
   final bool showRecoveryTrend; // [Added] 회복 추이 그래프 표시 여부
   final String checklistType; // [Added] default 'PATIENT'
   final bool hideLeftBorder; // [Added]
+  final bool hideExpandButton; // [Added]
 
   const DailyChecklistCard({
     Key? key,
@@ -30,6 +31,7 @@ class DailyChecklistCard extends StatefulWidget {
     this.showRecoveryTrend = false,
     this.checklistType = 'PATIENT', // Default
     this.hideLeftBorder = false, // Default
+    this.hideExpandButton = false, // Default
   }) : super(key: key);
 
   @override
@@ -216,6 +218,7 @@ class DailyChecklistCardState extends State<DailyChecklistCard> {
           statusText: _status,
           feedback: _feedback, 
           hideFeedback: widget.hideFeedback,
+          hideExpandButton: widget.hideExpandButton,
           // Inject Graph here? ChecklistCollectionCard needs update.
           // Let's update ChecklistCollectionCard locally or pass a builder?
           // Adding a `bottomWidget` parameter to `ChecklistCollectionCard` seems best.

@@ -641,6 +641,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 forceResultOnly: true, 
                 hideFeedback: true, 
                 showRecoveryTrend: true, // [Added] 회복 변화 그래프 표시
+                hideExpandButton: true, // [Added] 보러가기 삭제
                 onChecklistCompleted: () {
                   _fetchDashboardData(); 
                 },

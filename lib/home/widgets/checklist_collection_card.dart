@@ -16,6 +16,7 @@ class ChecklistCollectionCard extends StatefulWidget {
   final bool hideFeedback; // [Added] 피드백 섹션 숨김 여부
   final Widget? bottomWidget; // [Added] 하단에 추가할 위젯
   final String checklistType; // [Added] 'PATIENT' or 'FAMILY'
+  final bool hideExpandButton; // [Added] '보러가기' 버튼 숨김 여부
 
   const ChecklistCollectionCard({
     Key? key,
@@ -31,6 +32,7 @@ class ChecklistCollectionCard extends StatefulWidget {
     this.hideFeedback = false,
     this.bottomWidget,
     this.checklistType = 'PATIENT',
+    this.hideExpandButton = false,
   }) : super(key: key);
 
   @override
@@ -147,173 +149,182 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
         children: [
           // Header Section (Always visible)
           GestureDetector(
-            onTap: _toggleExpand,
+            onTap: widget.hideExpandButton ? null : _toggleExpand,
             behavior: HitTestBehavior.opaque,
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.assignment_turned_in_rounded, color: primaryColor, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.assignment_turned_in_rounded, color: primaryColor, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              widget.title,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          // [수정하기] 버튼
-                          if (widget.userData != null && !widget.hideEditButton) 
-                            InkWell(
-                              onTap: _openModifyModal,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  widget.title,
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              // [수정하기] 버튼
+                              if (widget.userData != null && !widget.hideEditButton) 
+                                InkWell(
+                                  onTap: _openModifyModal,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                                      borderRadius: BorderRadius.circular(12),
+                                      color: Colors.transparent,
+                                    ),
+                                    child: const Text(
+                                      '수정하기',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.bold
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 8),
+
+                          // "상세내역" Badge - Toggles expansion
+                          if (!widget.hideExpandButton)
+                            GestureDetector(
+                              onTap: _toggleExpand,
+                              behavior: HitTestBehavior.opaque,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
                                   border: Border.all(color: Colors.grey.withOpacity(0.3)),
                                   borderRadius: BorderRadius.circular(12),
-                                  color: Colors.transparent,
+                                  color: _isExpanded ? primaryColor.withOpacity(0.1) : Colors.transparent,
                                 ),
-                                child: const Text(
-                                  '수정하기',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey,
-                                    fontWeight: FontWeight.bold
-                                  ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      _isExpanded ? '접기' : '보러가기', 
+                                      style: TextStyle(
+                                        fontSize: 11, 
+                                        color: _isExpanded ? primaryColor : Colors.grey, 
+                                        fontWeight: FontWeight.bold
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                      size: 16,
+                                      color: _isExpanded ? primaryColor : Colors.grey,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          const SizedBox(width: 8),
+                            ],
+                          ),
 
-                          // "상세내역" Badge - Toggles expansion
-                          GestureDetector(
-                            onTap: _toggleExpand,
-                            behavior: HitTestBehavior.opaque,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                                borderRadius: BorderRadius.circular(12),
-                                color: _isExpanded ? primaryColor.withOpacity(0.1) : Colors.transparent,
-                              ),
-                              child: Row(
+                          const SizedBox(height: 12),
+                          // [Modified] 3-Segment Status Bar instead of text/points
+                          Builder(
+                            builder: (context) {
+                              int statusIndex = 0; // 0: 주의, 1: 성장노력, 2: 안정유지
+                              
+                              if (widget.checklistType == 'FAMILY') {
+                                final List<String> groupCategories = _selectedFamilyGroup == 'ROLE' 
+                                    ? ['재정관리', '통제욕구', '건강한대화', '건강한피드백']
+                                    : ['신체지표', '정서지표', '사고지표', '대인관계지표'];
+                                
+                                double total = 0;
+                                double minScore = 10.0;
+                                for (var cat in groupCategories) {
+                                  double s = widget.scores[cat] ?? 0.0;
+                                  total += s;
+                                  if (s < minScore) minScore = s;
+                                }
+
+                                if (total >= 34 && minScore >= 8.0) statusIndex = 2;
+                                else if (total >= 24 && minScore >= 5.0) statusIndex = 1;
+                                else statusIndex = 0;
+                              } else {
+                                // Patient logic
+                                if (average >= 7.6) statusIndex = 2;
+                                else if (average >= 5.1) statusIndex = 1;
+                                else statusIndex = 0;
+                              }
+
+                              // Colors matching the request
+                              final List<Color> statusColors = [
+                                const Color(0xFFFF9800), // 주의: Orange
+                                const Color(0xFF2196F3), // 성장 노력: Blue
+                                const Color(0xFF4CAF50), // 안정 유지: Green
+                              ];
+                              final List<String> statusLabels = ['주의', '성장 노력', '안정 유지'];
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    _isExpanded ? '접기' : '보러가기', 
-                                    style: TextStyle(
-                                      fontSize: 11, 
-                                      color: _isExpanded ? primaryColor : Colors.grey, 
-                                      fontWeight: FontWeight.bold
-                                    ),
+                                  // Segmented Bar
+                                  Row(
+                                    children: List.generate(3, (index) {
+                                      final isActive = index == statusIndex;
+                                      return Expanded(
+                                        child: Container(
+                                          height: 6,
+                                          margin: EdgeInsets.only(
+                                            right: index < 2 ? 4 : 0,
+                                            left: index > 0 ? 4 : 0,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isActive ? statusColors[index] : const Color(0xFFEEEEEE),
+                                            borderRadius: BorderRadius.circular(3),
+                                          ),
+                                        ),
+                                      );
+                                    }),
                                   ),
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                    size: 16,
-                                    color: _isExpanded ? primaryColor : Colors.grey,
+                                  const SizedBox(height: 8),
+                                  // Labels
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: List.generate(3, (index) {
+                                      final isActive = index == statusIndex;
+                                      return Text(
+                                        statusLabels[index],
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                                          color: isActive ? statusColors[index] : const Color(0xFF9E9E9E),
+                                        ),
+                                      );
+                                    }),
                                   ),
                                 ],
-                              ),
-                            ),
+                              );
+                            }
                           ),
                         ],
                       ),
-
-                      const SizedBox(height: 12),
-                      // [Modified] 3-Segment Status Bar instead of text/points
-                      Builder(
-                        builder: (context) {
-                          int statusIndex = 0; // 0: 주의, 1: 성장노력, 2: 안정유지
-                          
-                          if (widget.checklistType == 'FAMILY') {
-                            final List<String> groupCategories = _selectedFamilyGroup == 'ROLE' 
-                                ? ['재정관리', '통제욕구', '건강한대화', '건강한피드백']
-                                : ['신체지표', '정서지표', '사고지표', '대인관계지표'];
-                            
-                            double total = 0;
-                            double minScore = 10.0;
-                            for (var cat in groupCategories) {
-                              double s = widget.scores[cat] ?? 0.0;
-                              total += s;
-                              if (s < minScore) minScore = s;
-                            }
-
-                            if (total >= 34 && minScore >= 8.0) statusIndex = 2;
-                            else if (total >= 24 && minScore >= 5.0) statusIndex = 1;
-                            else statusIndex = 0;
-                          } else {
-                            // Patient logic
-                            if (average >= 7.6) statusIndex = 2;
-                            else if (average >= 5.1) statusIndex = 1;
-                            else statusIndex = 0;
-                          }
-
-                          // Colors matching the request
-                          final List<Color> statusColors = [
-                            const Color(0xFFFF9800), // 주의: Orange
-                            const Color(0xFF2196F3), // 성장 노력: Blue
-                            const Color(0xFF4CAF50), // 안정 유지: Green
-                          ];
-                          final List<String> statusLabels = ['주의', '성장 노력', '안정 유지'];
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Segmented Bar
-                              Row(
-                                children: List.generate(3, (index) {
-                                  final isActive = index == statusIndex;
-                                  return Expanded(
-                                    child: Container(
-                                      height: 6,
-                                      margin: EdgeInsets.only(
-                                        right: index < 2 ? 4 : 0,
-                                        left: index > 0 ? 4 : 0,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isActive ? statusColors[index] : const Color(0xFFEEEEEE),
-                                        borderRadius: BorderRadius.circular(3),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ),
-                              const SizedBox(height: 8),
-                              // Labels
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: List.generate(3, (index) {
-                                  final isActive = index == statusIndex;
-                                  return Text(
-                                    statusLabels[index],
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                                      color: isActive ? statusColors[index] : const Color(0xFF9E9E9E),
-                                    ),
-                                  );
-                                }),
-                              ),
-                            ],
-                          );
-                        }
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+                
+                // [Added] Bottom Widget (Injection point for Graph)
+                if (widget.bottomWidget != null) widget.bottomWidget!,
               ],
             ),
           ),
@@ -513,41 +524,43 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
             sizeCurve: Curves.easeInOut,
           ),
           
-          if (widget.bottomWidget != null) ...[
-            const SizedBox(height: 24),
-            const Divider(height: 1, color: Color(0xFFF0F0F0)),
-            widget.bottomWidget!,
           ],
-        ],
-      ),
-    );
-  }
+        ),
+      );
+    }
 
   // State for detailed category selection
   String _selectedDetailCategory = '신체지표';
 
   final Map<String, Map<String, String>> _detailFeedbacks = {
     '신체지표': {
-      '주의': '지금은 몸보다 마음이 더 지쳐 있을 수 있어요. 하지만 단 10분의 산책만으로도 내 감정과 생각이 훨씬 부드러워질 수 있습니다. 지금 이 자리에서 움직여 보는 것부터 시작해 보세요.',
+      '위험': '몸이 매우 무겁고 지쳐계신 듯 해요~ 수면 및 신체활동 부족은 전반적인 에너지 저하와 감정 조절에 영향을 미칠 수 있습니다. 안정적인 회복을 위해 짧은 산책과 적당한 수면시간 확보를 위한 노력이 필요합니다.',
+      '주의': '신체 리듬을 찾으려는 노력이 생각보다 쉽지 않게 느껴질 수 있습니다. 신체적 활력은 회복에 매우 중요한 요소라는 걸 기억하고 숙면할 수 있는 환경을 조성하고, 조금씩 신체활동 시간을 늘려나가면 어떨까요?',
+      '회복 노력': '안정적인 수면과 신체활동을 위한 노력이 지속되고 있습니다. 이러한 노력은 스트레스와 충동에 대한 대처 능력을 높이는 데 도움이 됩니다. 안정유지 상태 도달을 위해 조금만 더 노력해 주세요~',
       '성장 노력': '조금씩 몸을 움직여 보려는 시도가 있으셨군요! 중요한 건 자주 하는 것보다 ‘잊지 않고 나를 돌아보는 습관’을 만드는 거예요. 한 번의 실천이 나를 회복의 길로 다시 데려옵니다.',
-      '안정유지': '지금은 몸을 돌보는 일상의 규칙이 자리를 잡아가고 있어요. 회복은 마음만이 아니라 몸에서부터 시작된다는 것을 기억하고, 이 흐름을 잘 이어나가 주세요.',
+      '안정유지': '건강한 수면과 신체활동을 실천하고 계시는군요! 꾸준한 자기관리는 회복에도 긍정적 영향을 미치고 있다는 사실을 잊지 말고 지금처럼 자기 돌봄을 소중히 이어가 주세요~',
     },
     '정서지표': {
-      '주의': '지금은 감정이 쌓여서 쉽게 무기력해지거나 분노가 앞설 수 있어요. 감정을 억누르기보다, 잠깐 멈추고 나의 마음을 들여다보는 시간이 필요합니다. 호흡부터 천천히 시작해보세요. 감정을 다룰 수 있다는 믿음이 회복의 시작이에요.',
-      '성장 노력': '감정을 억누르지 않고, 천천히 들여다보려는 시도를 잘 이어가고 계세요. 완벽하지 않아도 괜찮아요. 중요한 건 내가 감정을 다룰 수 있다는 ‘경험’을 조금씩 쌓아가는 것입니다.',
-      '안정유지': '감정을 건강하게 바라보고, 조절하고, 흘려보내는 힘이 잘 자리 잡아가고 있어요. 이 회복된 감정 리듬이 내 삶뿐만 아니라 가족 전체를 지켜주는 보호막이 됩니다. 지금의 마음 돌봄을 소중히 이어가 주세요.',
+      '위험': '오늘 많이 지치고 힘든 하루였군요! 금단증상으로 인해 작은 일에도 예민하게 반응하거나, 답답함과 무료함을 느낄 수 있습니다. 감정을 억누르기보다 잠시 내 감정을 들여다보면 어떨까요?',
+      '주의': '감정이 다소 불안정하거나 표현이 과했을 수 있어요. 스스로에게 ‘그럴 수 있지, 괜찮아’라고 말해주세요. 회복은 감정을 잘 다루는 연습에서 시작됩니다. 잠시 나만의 시간을 가져보면 어떨까요?',
+      '회복 노력': '감정을 자각하고 다루는 방식이 조금씩 자리 잡는 모습이에요. 불편한 감정이 있어도 흔들리지 않고 나를 지키려는 태도는 회복의 핵심입니다. 오늘 하루, 내 감정을 존중하고 돌보려 한 자신을 칭찬해 주세요.',
+      '성장 노력': '감정을 억누르지 않고, 천천히 들여다보려는 시도를 잘 이어가고 계세요. 완벽하지 않아도 괜찮아요. 중요한 건 내가 감정을 다룰 수 있다는 ‘경험’을 조금씩 쌓아가고 있다는 점입니다.',
+      '안정유지': '정서적으로 안정된 오늘을 보내고 계시는군요. 평온한 마음으로 회복을 더 깊이 들여다 볼 수 있는 기회가 될 것 같아요. 지금처럼 감정의 흐름에 귀 기울이며 자기돌봄을 지속해 주세요!',
     },
     '사고지표': {
-      '주의': '지금은 부정적인 생각이 마음을 지배할 수 있는 시기입니다. 그 생각이 ‘사실인지’ 아니면 ‘감정에 따른 해석인지’ 구분해보는 연습부터 시작해보세요. 생각은 감정처럼 흘러가고, 우리는 그것을 관찰할 수 있어요.',
+      '위험': '부정적인 사고와 회피적인 생각이 반복되어 일상에 집중하기 어려운 상태일 수 있습니다. 도박에 대한 충동이 커질 수 있으니, 지금 당장 믿을 수 있는 사람에게 도움을 요청하거나 안전한 장소로 이동하는 것이 필요합니다.',
+      '주의': '집중이 잘 안되거나 현실 회피적인 생각을 종종 할 수 있어요. 이런 생각을 차분하게 종이에 적어본다면, 자신의 생각이 행동에 미치는 영향에 대해 이해하는 데 도움이 될 수 있습니다. 지금 바로 실천해 보면 어떨까요?',
+      '회복 노력': '일상생활에 어느 정도 집중이 가능하고, 회피적 사고도 이전보다 많이 개선되고 있습니다. 자기 생각을 잘 인식하고 조절해 보려는 노력은 안정적인 회복의 밑거름이 된다는 사실을 기억해 주세요~ 지금처럼 일상의 작은 실천을 지속해 주세요~',
       '성장 노력': '지금은 생각의 자동 반응에서 벗어나려는 중요한 시점입니다. 완벽히 바꾸려 하지 않아도 괜찮아요. 다르게 바라보려는 태도만으로도 사고의 흐름은 달라질 수 있습니다. ‘이건 내 생각일 뿐’이라는 문장을 기억해보세요.',
-      '안정유지': '지금은 생각에 휘둘리기보다 스스로 선택하는 힘이 커진 상태입니다. 사고의 균형은 감정의 균형으로, 결국 관계의 균형으로 이어집니다. 지금처럼 나의 생각을 들여다보고, 조율하는 힘을 잘 이어가 주세요.',
+      '안정유지': '일상 활동에 대한 집중력과 사고 조절 능력이 안정적으로 유지되고 있습니다. 이런 마음의 중심 잡기가 지속되어 내적 자기통제력이 잘 작동할 수 있도록 자신만의 좋은 습관을 꾸준히 이어가 주세요!',
     },
     '대인관계지표': {
-      '주의': '지금은 너무 힘이들어, 관계를 피하거나 닫아둘 수 있어요. 그러나 회복은 연결 속에서 이루어 집니다. 작은 안부 인사, 짧은 전화 한 통이 회복의 문을 여는 시작이 될 수 있어요.',
+      '위험': '대인관계에서 불편함이나 단절감을 강하게 느끼셨던 하루였을 수 있어요. 관계가 고립되었을 때, 도박 행동으로 이어지기도 합니다. 내 상황을 마음 터놓고 대화할 수 있는 안전한 대상이나 상담사와 연락해보면 어떨까요? 늘 혼자가 아니라는 사실을 기억해 주세요.',
+      '주의': '대인관계에서 다소 긴장감이나 거리감을 느끼셨을 수 있어요. 회복 과정에서 관계에 대한 불안이나 방어적인 마음은 매우 자연스러운 반응입니다. 가까운 사람과 짧은 인사나 메시지로 소통을 시도해 보는 것도 좋은 시작이 될 수 있어요.',
+      '회복 노력': '다른 사람과 소통하고 관계를 유지하려는 노력이 보입니다. 관계에서의 어려움을 인식하면서도 피하지 않고 마주하려는 태도는 큰 용기입니다. 이런 노력이 쌓여 자신이 원하는 관계 회복으로 이어질 거에요!',
       '성장 노력': '이제 관계를 조금씩 회복하려는 시도가 시작되고 있어요. 완벽한 관계보다, ‘그냥 함께하는 시간’ 자체가 큰 의미입니다. 너무 많은 걸 기대하기보다 ‘연결감’ 자체를 느끼는 데 집중해보세요.',
-      '안정유지': '지금은 관계 속에서 나를 지키면서도 따뜻하게 연결되어 있으시군요! 혼자가 아니라는 경험은 회복을 지탱하는 큰 자원이 됩니다. 지금의 관계 흐름을 소중히 지켜가 주세요.',
+      '안정유지': '대인관계에서 따뜻한 소통이나 편안함을 느끼고 계시네요. 이러한 긍정적인 경험은 정서 안정뿐 아니라 회복 동기 유지에도 도움을 줍니다. 지금처럼 나를 지지해주는 사람들과의 연결을 잘 이어가 주세요!',
     },
-    // Family Categories Placeholders (Need specific texts later)
     '재정관리':{
       '주의': '지금은 재정 지원을 반복하기 쉬운 시기지만, 이는 회복에 도움이 되기보다 도박을 지속시킬 수 있습니다. 회복은 고통을 대신 해주는 것이 아니라, 당사자가 스스로 마주할 수 있도록 돕는 과정입니다. 조금 힘들더라도 재정관리 원칙을 세우고 지켜주세요.',
       '성장 노력': '돈을 직접 주는 건 피하지만 여전히 감정에 따라 흔들릴 수 있는 단계입니다. 지금은 도박자가 책임감을 가질 수 있도록 재정 경계를 연습해 나가야 할 시기이며, ‘돈’이 강한 갈망을 자극할 수 있다는 점을 기억해 주세요.',
@@ -559,7 +572,7 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
       '안정유지': '회복의 기반이 안정된 상태예요. 중독자와의 신뢰 관계를 유지하며, 감정에 휘둘리지 않고 건강한 거리두기를 실천하고 계십니다. 지금처럼 ‘내 감정도 돌보며, 상대를 존중하는 태도’를 지속해 주세요.',
     },
     '건강한대화':{
-       '주의': '지금은 대화를 통해 회복을 돕기보다, 감정이 앞서며 관계가 단절될 수 있는 시기입니다. 대화는 ‘설득’이나 ‘통제’가 아닌, 서로를 이해하기 위한 연결 통로입니다. 나의 감정부터 알아차리는 연습을 시작해 보세요.',
+       '주의': '지금은 대화를 통해 회복을 돕기보다, 감정이 앞서며 관계가 단절될 수 있는 시기입니다. 대화은 ‘설득’이나 ‘통제’가 아닌, 서로를 이해하기 위한 연결 통로입니다. 나의 감정부터 알아차리는 연습을 시작해 보세요.',
        '성장 노력': '지금은 건강한 대화를 연습해 나가는 시기로, 완벽하지 않아도 괜찮습니다. 중요한 건 말을 많이 하기보다 진심으로 들어주는 태도이며, 실수해도 감정을 함께 다루려는 노력이 회복에 큰 도움이 됩니다.',
        '안정유지': '지금은 서로를 존중하며 편안하게 대화할 수 있는 단계로, 따뜻한 소통이 회복자의 신뢰를 더 깊게 만들어줍니다. 이 흐름을 잘 이어가 주세요.',
     },
@@ -649,13 +662,13 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
         statusColor = const Color(0xffFF9800);
       }
     } else {
-      // Patient: 2 questions per category, max 20
+      // Patient: Back to 20-point scale for Subject (matching image)
       totalScore = (averageScore * 2).round();
       if (totalScore >= 17) {
         statusKey = '안정유지';
         statusColor = const Color(0xff4CAF50);
       } else if (totalScore >= 13) {
-        statusKey = '회복 노력';
+        statusKey = '회복 노력'; // For Patient only
         statusColor = const Color(0xff2196F3);
       } else if (totalScore >= 8) {
         statusKey = '주의';
@@ -773,7 +786,7 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                            "총 $totalScore점",
+                            widget.checklistType == 'FAMILY' ? "$totalScore점" : "총 $totalScore점",
                             style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.grey[600],
@@ -899,7 +912,7 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
             Alignment.centerLeft,
         ];
     } else {
-        categories = ['신체 지표', '대인관계 지표', '사고 지표', '정서 지표'];
+        categories = ['신체지표', '대인관계지표', '사고지표', '정서지표'];
         displayCategories = ['신체', '대인', '사고', '정서'];
         alignments = [
             Alignment.topCenter,
@@ -953,7 +966,7 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
             status = '안정유지';
             statusColor = const Color(0xff4CAF50);
           } else if (totalScore >= 13) {
-            status = '회복노력'; 
+            status = '회복 노력'; 
             statusColor = const Color(0xff2196F3);
           } else if (totalScore >= 8) {
             status = '주의';
