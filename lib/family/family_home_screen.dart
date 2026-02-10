@@ -15,7 +15,7 @@ import 'positive_checklist_screen.dart';
 import 'package:kcgp_cb/home/profile_screen.dart';
 import 'package:kcgp_cb/home/daily_checklist_card.dart';
 import 'package:kcgp_cb/home/widgets/recovery_trend_card.dart';
-import 'widgets/family_growth_status_card.dart';
+
 
 
 import 'dart:ui';
@@ -44,7 +44,7 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
   // Tutorial Keys
   final GlobalKey _dDayCardKey = GlobalKey();
   final GlobalKey _positiveChecklistKey = GlobalKey();
-  final GlobalKey _checklistCardKey = GlobalKey();
+
   final GlobalKey _navTrainingKey = GlobalKey();
 
 
@@ -72,14 +72,7 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
          align: ContentAlign.bottom,
        ));
        
-       // 2. 긍정 관리 (메뉴 카드)
-       targets.add(TutorialUtil.createTarget(
-         identify: 'family_checklist',
-         key: _positiveChecklistKey,
-         title: '긍정관리 체크리스트',
-         description: '가족의 긍정적인 변화를 기록하고 관리해보세요.',
-         align: ContentAlign.bottom,
-       ));
+
 
        // 3. 트레이닝 탭
        targets.add(TutorialUtil.createTarget(
@@ -308,20 +301,12 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
               child: _buildDDayCard(),
             ),
             const SizedBox(height: 24),
-
-            FamilyGrowthStatusCard(
-              key: _checklistCardKey,
+            DailyChecklistCard(
               userData: widget.userData,
-              date: DateFormat('yyyy-MM-dd').format(DateTime.now()),
-              showRecoveryTrend: true,
-              initiallyExpanded: false,
-              showChartValues: false,
-              showFeedbackToggle: false,
-              onRefresh: () {
-                setState(() {});
-              },
+              checklistType: 'FAMILY',
+              customTitle: '나의 성장 상태',
+              hideLeftBorder: true,
             ),
-
             const SizedBox(height: 24),
             _buildQuickAccessGrid(),
             const SizedBox(height: 24),

@@ -14,7 +14,9 @@ class DailyChecklistCard extends StatefulWidget {
   final bool forceResultOnly; // [Added] 결과만 보기 모드 (작성 불가)
   final bool hideIfSubmitted; // [Added] 제출 완료 시 숨김 모드
   final bool hideFeedback; // [Added] 피드백 숨김 모드
-  final bool showRecoveryTrend; // [Added] 회복 변화 그래프 표시 여부
+  final bool showRecoveryTrend; // [Added] 회복 추이 그래프 표시 여부
+  final String checklistType; // [Added] default 'PATIENT'
+  final bool hideLeftBorder; // [Added]
 
   const DailyChecklistCard({
     Key? key,
@@ -25,7 +27,9 @@ class DailyChecklistCard extends StatefulWidget {
     this.forceResultOnly = false,
     this.hideIfSubmitted = false,
     this.hideFeedback = false,
-    this.showRecoveryTrend = false, // Default false
+    this.showRecoveryTrend = false,
+    this.checklistType = 'PATIENT', // Default
+    this.hideLeftBorder = false, // Default
   }) : super(key: key);
 
   @override
@@ -116,7 +120,10 @@ class DailyChecklistCardState extends State<DailyChecklistCard> {
     final result = await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => DailyChecklistModal(userData: widget.userData),
+      builder: (context) => DailyChecklistModal(
+        userData: widget.userData,
+        checklistType: widget.checklistType, // [Modified] Pass type
+      ),
     );
 
     if (result == true) {
@@ -205,16 +212,21 @@ class DailyChecklistCardState extends State<DailyChecklistCard> {
           },
           title: _getTitle(),
           hideEditButton: widget.forceResultOnly, 
-          hideLeftBorder: widget.forceResultOnly,
+          hideLeftBorder: widget.hideLeftBorder || widget.forceResultOnly,
           statusText: _status,
           feedback: _feedback, 
           hideFeedback: widget.hideFeedback,
           // Inject Graph here? ChecklistCollectionCard needs update.
           // Let's update ChecklistCollectionCard locally or pass a builder?
           // Adding a `bottomWidget` parameter to `ChecklistCollectionCard` seems best.
-          bottomWidget: widget.showRecoveryTrend 
-              ? RecoveryTrendCard(userData: widget.userData, isEmbedded: true)
+           bottomWidget: widget.showRecoveryTrend 
+              ? RecoveryTrendCard(
+                  userData: widget.userData, 
+                  isEmbedded: true,
+                  checklistType: widget.checklistType, // [Modified] Pass type
+                )
               : null,
+          checklistType: widget.checklistType, // [Modified] Pass type
       );
     } else {
       return Container(
@@ -287,7 +299,11 @@ class DailyChecklistCardState extends State<DailyChecklistCard> {
             // [Added] Graph for Not Submitted State
             if (widget.showRecoveryTrend) ...[
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
-              RecoveryTrendCard(userData: widget.userData, isEmbedded: true),
+              RecoveryTrendCard(
+                userData: widget.userData, 
+                isEmbedded: true,
+                checklistType: widget.checklistType, // [Modified] Pass type
+              ),
             ]
           ],
         ),

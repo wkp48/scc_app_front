@@ -5,11 +5,13 @@ import '../utils/toast_utils.dart';
 class DailyChecklistModal extends StatefulWidget {
   final Map<String, dynamic> userData;
   final Map<int, double>? initialAnswers; // Added for editing
+  final String checklistType; // [Added]
 
   const DailyChecklistModal({
     Key? key, 
     required this.userData, 
     this.initialAnswers,
+    this.checklistType = 'PATIENT', // Default
   }) : super(key: key);
 
   @override
@@ -29,7 +31,7 @@ class _DailyChecklistModalState extends State<DailyChecklistModal> {
   }
 
   Future<void> _fetchQuestions() async {
-    final response = await ApiService.getDailyChecklistQuestions();
+    final response = await ApiService.getDailyChecklistQuestions(type: widget.checklistType);
     if (mounted) {
       if (response['success'] == true) {
         setState(() {

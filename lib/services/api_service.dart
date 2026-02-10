@@ -2528,7 +2528,7 @@ class ApiService {
 
 
   // 일일 체크리스트 질문 조회
-  static Future<Map<String, dynamic>> getDailyChecklistQuestions() async {
+  static Future<Map<String, dynamic>> getDailyChecklistQuestions({String type = 'PATIENT'}) async {
     try {
       if (isOfflineMode) {
         return {
@@ -2541,7 +2541,7 @@ class ApiService {
         };
       }
       final response = await http.get(
-        Uri.parse('${await baseUrl}/daily-checklist/questions'),
+        Uri.parse('${await baseUrl}/daily-checklist/questions?type=$type'),
         headers: {'Content-Type': 'application/json'},
       );
       

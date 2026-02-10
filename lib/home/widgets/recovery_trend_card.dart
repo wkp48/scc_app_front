@@ -4,12 +4,14 @@ import '../../services/api_service.dart';
 
 class RecoveryTrendCard extends StatefulWidget {
   final Map<String, dynamic> userData;
-  final bool isEmbedded; // [Added] Embedded mode flag
+  final bool isEmbedded; // [Added]
+  final String checklistType; // [Added] 'PATIENT' or 'FAMILY'
 
   const RecoveryTrendCard({
     Key? key, 
     required this.userData,
-    this.isEmbedded = false, // Default false
+    this.isEmbedded = false,
+    this.checklistType = 'PATIENT', // Default
   }) : super(key: key);
 
   @override
@@ -17,38 +19,42 @@ class RecoveryTrendCard extends StatefulWidget {
 }
 
 class _RecoveryTrendCardState extends State<RecoveryTrendCard> {
-  bool _isExpanded = true; // [Modified] Default expanded
-  bool _isLoading = false;
+  bool _isExpanded = true;
+  bool _isLoading = true; // Start true
   List<Map<String, dynamic>> _historyData = [];
   
-  // Color Palette specifically designed for distinction
-  final Map<String, Color> _categoryColors = {
+  // Family Group State
+  String _selectedFamilyGroup = 'ROLE'; // 'ROLE' (가족 역할) or 'RECOVERY' (개인 회복)
+
+  // Full Color Palette
+  final Map<String, Color> _allCategoryColors = {
     '신체 지표': const Color(0xFF5C72EB), // Blue
     '정서 지표': const Color(0xFF4CAF50), // Green
     '사고 지표': const Color(0xFFFF9800), // Orange
     '대인관계 지표': const Color(0xFF9C27B0), // Purple
+    // Family Categories
+    '재정관리': const Color(0xFF795548), // Brown
+    '통제욕구': const Color(0xFFE91E63), // Pink
+    '건강한 대화': const Color(0xFF00BCD4), // Cyan
+    '건강한 피드백': const Color(0xFF607D8B), // Blue Grey
   };
 
   @override
   void initState() {
     super.initState();
-    // Default collapsed, load data when expanded or pre-load? 
-    // Let's pre-load to be ready
     _fetchHistory();
   }
 
   Future<void> _fetchHistory() async {
-    setState(() => _isLoading = true);
     final uid = widget.userData['uid'] ?? widget.userData['userid'];
-    
-    // Fetch 14 days history
-    final result = await ApiService.getChecklistHistory(uid, days: 14);
+    // History endpoint returns last N days. Default 7.
+    final result = await ApiService.getChecklistHistory(uid, days: 7);
     
     if (mounted) {
       setState(() {
         _isLoading = false;
         if (result['success'] == true) {
-           _historyData = List<Map<String, dynamic>>.from(result['data']);
+          _historyData = List<Map<String, dynamic>>.from(result['data']);
         }
       });
     }
@@ -56,291 +62,248 @@ class _RecoveryTrendCardState extends State<RecoveryTrendCard> {
 
   @override
   Widget build(BuildContext context) {
-    // If embedded, remove Container decoration
-    if (widget.isEmbedded) {
-      return Column(
-        children: _buildContent(),
+    if (_isLoading) {
+      return const SizedBox(
+        height: 100, 
+        child: Center(child: CircularProgressIndicator())
       );
     }
 
+    if (_historyData.isEmpty) {
+       return Container(
+         padding: const EdgeInsets.symmetric(vertical: 24),
+         alignment: Alignment.center,
+         child: const Text('최근 기록이 없습니다.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+       );
+    }
+
     return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
+      padding: EdgeInsets.all(widget.isEmbedded ? 0 : 20),
+      decoration: widget.isEmbedded ? null : BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
-        children: _buildContent(),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!widget.isEmbedded) ...[
+             const Text(
+              '회복 변화 추이', // Title might need update if it's not trend anymore, but "Growth Status" contextually fits
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+          ],
+          
+          if (widget.isEmbedded) const SizedBox(height: 16),
+
+          // Family Group Toggle
+          if (widget.checklistType == 'FAMILY') ...[
+            _buildFamilyGroupToggle(),
+            const SizedBox(height: 32),
+          ],
+          
+          // Radar Chart
+          SizedBox(
+            height: 300,
+            child: RadarChart(
+              _buildRadarChartData(),
+              swapAnimationDuration: const Duration(milliseconds: 400),
+              swapAnimationCurve: Curves.easeInOut,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  List<Widget> _buildContent() {
-    return [
-          // Header / Toggle Button
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isExpanded = !_isExpanded;
-              });
-            },
-            // [Modified] Radius based on embedded status
-            borderRadius: widget.isEmbedded ? BorderRadius.circular(16) : BorderRadius.circular(24),
-            child: Padding(
-              // [Modified] Padding based on embedded status
-              padding: widget.isEmbedded 
-                  ? const EdgeInsets.symmetric(vertical: 16, horizontal: 0) 
-                  : const EdgeInsets.all(24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                   Row(
-                     children: [
-                       Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0F5FF),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.show_chart_rounded, color: Color(0xFF5C72EB), size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          '나의 회복 변화 그래프 보기',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF333333),
-                          ),
-                        ),
-                     ],
-                   ),
-                   Icon(
-                     _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                     color: Colors.grey,
-                   ),
-                ],
-              ),
-            ),
+  Widget _buildFamilyGroupToggle() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildAreaCard(
+            '가족 역할', 
+            'ROLE', 
+            Icons.family_restroom_rounded,
+            const Color(0xFF5C72EB),
           ),
-          
-          // Expanded Content
-          if (_isExpanded)
-            Padding(
-              // [Modified] Padding based on embedded status
-              padding: widget.isEmbedded 
-                  ? const EdgeInsets.only(bottom: 16) 
-                  : const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: _isLoading 
-                  ? const Center(child: CircularProgressIndicator())
-                  : _historyData.isEmpty || _historyData.length < 2
-                      ? const SizedBox(
-                          height: 100,
-                          child: Center(
-                            child: Text('데이터가 충분하지 않습니다.\n최소 2일 이상의 기록이 필요합니다.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-                          ),
-                        )
-                      : Column(
-                          children: [
-                            const SizedBox(height: 16),
-                            _buildLegend(),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              height: 250,
-                              child: LineChart(
-                                _buildChartData(),
-                              ),
-                            ),
-                          ],
-                        ),
-            ),
-    ];
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildAreaCard(
+            '개인 회복', 
+            'RECOVERY', 
+            Icons.self_improvement_rounded,
+            const Color(0xFF4CAF50),
+          ),
+        ),
+      ],
+    );
   }
-  
-  Widget _buildLegend() {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 8,
-      alignment: WrapAlignment.center,
-      children: _categoryColors.entries.map((entry) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
+
+  Widget _buildAreaCard(String label, String value, IconData icon, Color color) {
+    final isSelected = _selectedFamilyGroup == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedFamilyGroup = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : const Color(0xFFE0E0E0),
+            width: 2,
+          ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: color.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            )
+          ] : [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: Column(
           children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: entry.value,
-                shape: BoxShape.circle,
-              ),
+            Icon(
+              icon, 
+              color: isSelected ? Colors.white : color, 
+              size: 32
             ),
-            const SizedBox(width: 6),
+            const SizedBox(height: 12),
             Text(
-              entry.key.replaceAll(' 지표', ''), 
-              style: const TextStyle(fontSize: 12, color: Color(0xFF555555), fontWeight: FontWeight.w500),
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : const Color(0xFF1F1F1F),
+              ),
             ),
           ],
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 
-  LineChartData _buildChartData() {
-    // Process Data
-    // X-axis: Index 0 to N-1
-    // Y-axis: Score 0 to 10
-    
-    final categories = _categoryColors.keys.toList();
-    List<LineChartBarData> lineBarsData = [];
+  List<String> get _currentCategories {
+    if (widget.checklistType == 'FAMILY') {
+      return _selectedFamilyGroup == 'ROLE' 
+        ? ['재정관리', '통제욕구', '건강한 대화', '건강한 피드백']
+        : ['신체 지표', '정서 지표', '사고 지표', '대인관계 지표'];
+    }
+    return ['신체 지표', '정서 지표', '사고 지표', '대인관계 지표'];
+  }
 
-    for (String category in categories) {
-      List<FlSpot> spots = [];
-      for (int i = 0; i < _historyData.length; i++) {
-        final dayData = _historyData[i];
-        // [Modified] Safer map casting
-        final scores = dayData['scores'] as Map?;
-        
-        if (scores != null) {
-          if (scores.containsKey(category)) {
-             // Handle both int and double
-             try {
-               double score = (scores[category] as num).toDouble();
-               spots.add(FlSpot(i.toDouble(), score));
-             } catch (e) {
-               // print('Error parsing score for $category at index $i: $e');
-             }
+  Map<String, double> _getLatestScores() {
+    if (_historyData.isEmpty) return {};
+    final latest = _historyData.last; 
+    final scores = latest['scores'] as Map;
+    final Map<String, double> result = {};
+    
+    scores.forEach((key, value) {
+        if (value is num) result[key.toString()] = value.toDouble();
+    });
+    return result;
+  }
+
+  String _getStatusText(double score) {
+    if (score < 3) return '위험';
+    if (score < 6) return '주의';
+    if (score < 8) return '중간'; 
+    return '좋음';
+  }
+  
+  Color _getStatusColor(double score) {
+     if (score < 3) return const Color(0xFFFF4D4F); // Red
+     if (score < 6) return const Color(0xFFFFA940); // Orange
+     if (score < 8) return const Color(0xFF36CFC9); // Cyan/Green
+     return const Color(0xFF5C72EB); // Blue
+  }
+
+  RadarChartData _buildRadarChartData() {
+     final latestScores = _getLatestScores();
+     final categories = _currentCategories; 
+     
+     // Which categories to highlight/show based on selection
+     final List<String> roleCategories = ['재정관리', '통제욕구', '건강한 대화', '건강한 피드백'];
+     final List<String> recoveryCategories = ['신체 지표', '정서 지표', '사고 지표', '대인관계 지표'];
+     
+     final selectedSet = _selectedFamilyGroup == 'ROLE' ? roleCategories : recoveryCategories;
+
+     return RadarChartData(
+       radarTouchData: RadarTouchData(enabled: false),
+       tickCount: 1,
+       ticksTextStyle: const TextStyle(color: Colors.transparent),
+       gridBorderData: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
+       titlePositionPercentageOffset: 0.25, 
+       titleTextStyle: const TextStyle(color: Color(0xFF333333), fontSize: 11, fontWeight: FontWeight.bold),
+       getTitle: (index, angle) {
+          if (index >= categories.length) return const RadarChartTitle(text: '');
+          final category = categories[index];
+          String label = category.replaceAll(' 지표', '').replaceAll('건강한 ', '');
+          if (label == '대인관계') label = '대인';
+
+          double score = 0;
+          if (latestScores.containsKey(category)) {
+             score = latestScores[category]!;
           } else {
-             // Try fuzzy match
              String shortKey = category.split(' ')[0];
-             if (scores.containsKey(shortKey)) {
-                try {
-                   double score = (scores[shortKey] as num).toDouble();
-                   spots.add(FlSpot(i.toDouble(), score));
-                } catch (e) {}
+             if (latestScores.containsKey(shortKey)) {
+                 score = latestScores[shortKey]!;
              }
           }
-        }
-      }
-      //나의 회복 변화 그래프 직선 곡선
-      if (spots.isNotEmpty) {
-        lineBarsData.add(LineChartBarData(
-          spots: spots,
-          isCurved: true, // [Modified] Straight lines
-          color: _categoryColors[category],
-          barWidth: 3, // Increased width
-          isStrokeCapRound: true,
-          dotData: const FlDotData(show: true), // Enable dots to verify data points
-          belowBarData: BarAreaData(show: false),
-        ));
-      }
-    }
-
-     return LineChartData(
-      lineBarsData: lineBarsData, // [Fix] Add this missing parameter!
-      gridData: FlGridData(
-        show: true,
-        drawVerticalLine: true,
-        horizontalInterval: 2, // 0, 2, 4, 6, 8, 10
-        verticalInterval: 1,
-        getDrawingHorizontalLine: (value) {
-          return const FlLine(
-            color: Color(0xFFEEEEEE),
-            strokeWidth: 1,
+          
+          final status = _getStatusText(score);
+          // Return the title with status
+          return RadarChartTitle(
+            text: '$label\n($status)',
+            positionPercentageOffset: 0.1,
           );
-        },
-        getDrawingVerticalLine: (value) {
-          return const FlLine(
-            color: Color(0xFFEEEEEE),
-            strokeWidth: 1,
-          );
-        },
-      ),
-      titlesData: FlTitlesData(
-        show: true,
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        bottomTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 30,
-            interval: 1, 
-            getTitlesWidget: (value, meta) {
-              int index = value.toInt();
-              if (index >= 0 && index < _historyData.length) {
-                
-                 if (_historyData.length > 7 && index % 3 != 0 && index != _historyData.length - 1) {
-                   return const SizedBox.shrink();
-                 }
-                 
-                 final dateStr = _historyData[index]['date'] as String; // YYYY-MM-DD
-                 try {
-                   final date = DateTime.parse(dateStr);
-                   return SideTitleWidget(
-                     meta: meta, 
-                     child: Text(
-                       '${date.month}/${date.day}',
-                       style: const TextStyle(fontSize: 10, color: Color(0xFF999999)),
-                     ), 
-                   );
-                 } catch (e) {
-                   return const SizedBox.shrink();
+       },
+       dataSets: [
+         RadarDataSet(
+           fillColor: (_selectedFamilyGroup == 'ROLE' ? const Color(0xFF5C72EB) : const Color(0xFF4CAF50)).withOpacity(0.2),
+           borderColor: _selectedFamilyGroup == 'ROLE' ? const Color(0xFF5C72EB) : const Color(0xFF4CAF50),
+           entryRadius: 3,
+           borderWidth: 2,
+           dataEntries: categories.map((category) {
+              // Only provide data if the category is in the selected set
+              if (!selectedSet.contains(category)) {
+                 return const RadarEntry(value: 0);
+              }
+              
+              double score = 0;
+              if (latestScores.containsKey(category)) {
+                 score = latestScores[category]!;
+              } else {
+                 String shortKey = category.split(' ')[0];
+                 if (latestScores.containsKey(shortKey)) {
+                     score = latestScores[shortKey]!;
                  }
               }
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-        leftTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            interval: 2,
-            getTitlesWidget: (value, meta) {
-              return Text(
-                value.toInt().toString(),
-                style: const TextStyle(fontSize: 10, color: Color(0xFF999999)),
-              );
-            },
-            reservedSize: 20,
-          ),
-        ),
-      ),
-      borderData: FlBorderData(
-        show: false,
-      ),
-      minX: 0,
-      maxX: _historyData.isEmpty ? 0 : (_historyData.length - 1).toDouble(), // [Fix] Safety check
-      minY: 0,
-      maxY: 10,
-      lineTouchData: LineTouchData(
-        touchTooltipData: LineTouchTooltipData(
-          // tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
-          getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
-            return touchedBarSpots.map((barSpot) {
-              final flSpot = barSpot;
-              // Find category index? No directly mapped.
-              // We need to know which line corresponds to which category.
-              // LineChartBarData color matches _categoryColors.
-              
-              // Simple workaround: Just show value
-              return LineTooltipItem(
-                '${flSpot.y}',
-                const TextStyle(
-                  color: Colors.white, 
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
-                ),
-              );
-            }).toList();
-          },
-        ),
-      ),
-    );
+              return RadarEntry(value: score);
+           }).toList(),
+         ),
+         // Max Scale Reference
+         RadarDataSet(
+           fillColor: Colors.transparent,
+           borderColor: Colors.transparent,
+           entryRadius: 0,
+           dataEntries: categories.map((_) => const RadarEntry(value: 10)).toList(),
+         )
+       ],
+     );
   }
 }
