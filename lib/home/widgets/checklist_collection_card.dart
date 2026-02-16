@@ -239,19 +239,25 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
                           ),
 
                           const SizedBox(height: 12),
-                          // [Modified] 3-Segment Status Bar instead of text/points
+                          // [Modified] Multi-Segment Status Bar
                           Builder(
                             builder: (context) {
-                              int statusIndex = 0; // 0: 주의, 1: 성장노력, 2: 안정유지
-                              
+                              final List<Color> statusColors;
+                              final List<String> statusLabels;
+                              int statusIndex = 0;
+
                               if (widget.checklistType == 'FAMILY') {
-                                final List<String> groupCategories = _selectedFamilyGroup == 'ROLE' 
-                                    ? ['재정관리', '통제욕구', '건강한대화', '건강한피드백']
-                                    : ['신체지표', '정서지표', '사고지표', '대인관계지표'];
-                                
+                                // Family Logic (3 segments)
+                                statusColors = [
+                                  const Color(0xFFFF9800), // 주의
+                                  const Color(0xFF2196F3), // 성장 노력
+                                  const Color(0xFF4CAF50), // 안정 유지
+                                ];
+                                statusLabels = ['주의', '성장 노력', '안정 유지'];
+
                                 double total = 0;
                                 double minScore = 10.0;
-                                for (var cat in groupCategories) {
+                                for (var cat in ['재정관리', '통제욕구', '건강한대화', '건강한피드백']) {
                                   double s = widget.scores[cat] ?? 0.0;
                                   total += s;
                                   if (s < minScore) minScore = s;
@@ -261,32 +267,33 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
                                 else if (total >= 24 && minScore >= 5.0) statusIndex = 1;
                                 else statusIndex = 0;
                               } else {
-                                // Patient logic
-                                if (average >= 7.6) statusIndex = 2;
-                                else if (average >= 5.1) statusIndex = 1;
+                                // Patient Logic (4 segments)
+                                statusColors = [
+                                  const Color(0xFFFF5252), // 위험
+                                  const Color(0xFFFF9800), // 주의
+                                  const Color(0xFF2196F3), // 회복 노력
+                                  const Color(0xFF4CAF50), // 안정 유지
+                                ];
+                                statusLabels = ['위험', '주의', '회복 노력', '안정 유지'];
+
+                                if (average >= 7.6) statusIndex = 3;
+                                else if (average >= 5.1) statusIndex = 2;
+                                else if (average >= 2.6) statusIndex = 1;
                                 else statusIndex = 0;
                               }
-
-                              // Colors matching the request
-                              final List<Color> statusColors = [
-                                const Color(0xFFFF9800), // 주의: Orange
-                                const Color(0xFF2196F3), // 성장 노력: Blue
-                                const Color(0xFF4CAF50), // 안정 유지: Green
-                              ];
-                              final List<String> statusLabels = ['주의', '성장 노력', '안정 유지'];
 
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // Segmented Bar
                                   Row(
-                                    children: List.generate(3, (index) {
+                                    children: List.generate(statusLabels.length, (index) {
                                       final isActive = index == statusIndex;
                                       return Expanded(
                                         child: Container(
                                           height: 6,
                                           margin: EdgeInsets.only(
-                                            right: index < 2 ? 4 : 0,
+                                            right: index < statusLabels.length - 1 ? 4 : 0,
                                             left: index > 0 ? 4 : 0,
                                           ),
                                           decoration: BoxDecoration(
@@ -301,7 +308,7 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
                                   // Labels
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: List.generate(3, (index) {
+                                    children: List.generate(statusLabels.length, (index) {
                                       final isActive = index == statusIndex;
                                       return Text(
                                         statusLabels[index],
@@ -698,14 +705,15 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
             ),
             const SizedBox(height: 16),
             
-            // Category Tabs
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: categories.map((cat) {
-                  final isSelected = displayCategory == cat;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
+            // Category Tags
+            Row(
+              children: categories.map((cat) {
+                final isSelected = displayCategory == cat;
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: cat == categories.last ? 0 : 5,
+                    ),
                     child: GestureDetector(
                       onTap: () {
                         setState(() {
@@ -713,27 +721,29 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
                         });
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
                           color: isSelected ? activeColor : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: isSelected ? activeColor : Colors.grey[300]!,
                           ),
                         ),
-                        child: Text(
-                          cat,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey[600],
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                        child: Center(
+                          child: Text(
+                            cat.replaceAll('지표', ''),
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.grey[600],
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12, // Reduced to fit "대인관계"
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
+                  ),
+                );
+              }).toList(),
             ),
             const SizedBox(height: 16),
             
@@ -760,7 +770,7 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                                 Text(
-                                    displayCategory,
+                                    displayCategory.replaceAll('지표', ''),
                                     style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,

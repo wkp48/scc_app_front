@@ -907,7 +907,7 @@ class CalendarScreenState extends State<CalendarScreen> with SingleTickerProvide
                           case 'GRATITUDE': barColor = const Color(0xFFFF851B); title = "감사"; break;
                           case 'WALK': barColor = const Color(0xFF52C41A); title = "일상"; break;
                           case 'IMPULSE': barColor = const Color(0xFFFF4D4F); title = "충동"; break;
-                          case 'POSITIVE_SELF': barColor = const Color(0xFF722ED1); title = "긍정"; break;
+                          case 'POSITIVE_SELF': barColor = const Color(0xFF722ED1); title = "희망"; break;
                         }
                         return Container(
                           margin: const EdgeInsets.only(bottom: 2),
@@ -1065,7 +1065,7 @@ class CalendarScreenState extends State<CalendarScreen> with SingleTickerProvide
       groupedActivities.putIfAbsent(type, () => []).add(activity);
     }
 
-    // 그룹화된 데이터 순회 (표시 순서: 감사일기 -> 일상기록 -> 충동일지 -> 긍정진술 -> 기타)
+    // 그룹화된 데이터 순회 (표시 순서: 감사일기 -> 일상기록 -> 충동일지 -> 희망 리코딩 -> 기타)
     final order = ['GRATITUDE', 'WALK', 'IMPULSE', 'POSITIVE_SELF'];
     
     // 순서에 있는 타입들 먼저 처리
@@ -1432,6 +1432,68 @@ class CalendarScreenState extends State<CalendarScreen> with SingleTickerProvide
         label = '활동 기록';
     }
 
+    // Construct display content based on type if content is empty
+    Widget contentWidget;
+    if (type == 'GRATITUDE') {
+      final fields = [
+        activity['gratitudeTo'],
+        activity['gratitudeSituation'],
+        activity['gratitudeEmotion']
+      ].where((e) => e != null && e.toString().isNotEmpty).toList();
+      
+      if (fields.isEmpty) {
+        contentWidget = Text(content.isEmpty ? '내용 없음' : content, style: const TextStyle(color: Color(0xFF434343), fontSize: 15, height: 1.5));
+      } else {
+        contentWidget = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: fields.asMap().entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                '${entry.key + 1}. ${entry.value}',
+                style: const TextStyle(color: Color(0xFF434343), fontSize: 14, height: 1.4),
+                maxLines: imageUrls.isNotEmpty ? 1 : null,
+                overflow: imageUrls.isNotEmpty ? TextOverflow.ellipsis : null,
+              ),
+            );
+          }).toList(),
+        );
+      }
+    } else if (type == 'IMPULSE') {
+      final fields = [
+        activity['impulseSituation'],
+        activity['impulseThought'],
+        activity['impulseHelpful'],
+        activity['impulseAfter']
+      ].where((e) => e != null && e.toString().isNotEmpty).toList();
+
+      if (fields.isEmpty) {
+        contentWidget = Text(content.isEmpty ? '내용 없음' : content, style: const TextStyle(color: Color(0xFF434343), fontSize: 15, height: 1.5));
+      } else {
+        contentWidget = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: fields.asMap().entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                '${entry.key + 1}. ${entry.value}',
+                style: const TextStyle(color: Color(0xFF434343), fontSize: 14, height: 1.4),
+                maxLines: imageUrls.isNotEmpty ? 1 : null,
+                overflow: imageUrls.isNotEmpty ? TextOverflow.ellipsis : null,
+              ),
+            );
+          }).toList(),
+        );
+      }
+    } else {
+      contentWidget = Text(
+        content.isEmpty ? '내용 없음' : content,
+        style: const TextStyle(color: Color(0xFF434343), fontSize: 15, height: 1.5),
+        maxLines: imageUrls.isNotEmpty ? 3 : null,
+        overflow: imageUrls.isNotEmpty ? TextOverflow.ellipsis : null,
+      );
+    }
+
     return GestureDetector(
       onTap: () async {
         final result = await Navigator.push(
@@ -1444,7 +1506,7 @@ class CalendarScreenState extends State<CalendarScreen> with SingleTickerProvide
           ),
         );
         if (result == true) {
-          loadMonthlyAttendance(); // 일일 목록뿐만 아니라 전체 캘린더 마커(막대)를 갱신하기 위해 전체 로드
+          loadMonthlyAttendance(); 
         }
       },
       child: Container(
@@ -1480,57 +1542,57 @@ class CalendarScreenState extends State<CalendarScreen> with SingleTickerProvide
                   ),
               ],
             ),
-            if (title.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F1F1F)),
-              ),
-            ],
-            if (content.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                content,
-                style: TextStyle(color: Colors.grey[600], fontSize: 14, height: 1.5),
-              ),
-            ],
-            if (imageUrls.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 100,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: imageUrls.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    return FutureBuilder<String>(
-                      future: ApiService.baseUrl,
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) return const SizedBox.shrink();
-                        String imageUrl = imageUrls[index];
-                        String finalUrl = snapshot.data!.replaceAll('/api', '') + imageUrl;
-                        
-                        return ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            finalUrl,
-                            width: 100,
-                            height: 100,
-                            fit: BoxFit.cover,
-                            headers: {'X-User-Uid': widget.userData!['uid']},
+            const SizedBox(height: 12),
+            if (imageUrls.isNotEmpty)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 이미지 미리보기 (첫 번째 사진)
+                  FutureBuilder<String>(
+                    future: ApiService.baseUrl,
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
+                      }
+                      String finalUrl = snapshot.data!.replaceAll('/api', '') + imageUrls.first;
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          finalUrl,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          headers: {'X-User-Uid': widget.userData!['uid']},
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: 80,
+                            height: 80,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.error_outline, size: 20, color: Colors.grey),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 16),
+                  // 텍스트 정보 (내용 미리보기)
+                  Expanded(child: contentWidget),
+                ],
+              )
+            else
+              contentWidget,
           ],
         ),
       ),
     );
   }
+
 
   void _buildGroupedCards(List<Widget> cards, String type, List<dynamic> items) {
     if (items.isEmpty) return;

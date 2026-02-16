@@ -227,9 +227,13 @@ class _VoiceRecordScreenState extends State<VoiceRecordScreen> with SingleTicker
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            '오늘의 긍정적인 다짐을 목소리로 남겨보세요.',
-            style: TextStyle(color: Color(0xFF8C96A3), fontSize: 14),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              '과거의 잘못된 선택에 대한 후회와 반복하지 않겠다는 다짐 그리고, 더 나은 삶을 위한 계획과 목표 등을 녹음하고 스스로 마음을 다잡아 보세요.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF8C96A3), fontSize: 14, height: 1.5),
+            ),
           ),
           
           const Spacer(),
