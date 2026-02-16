@@ -33,31 +33,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: widget.task['color'].withOpacity(0.05),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: widget.task['color'].withOpacity(0.1)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.task['title'],
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: widget.task['color']),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.task['description'],
-                    style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.6),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
             const Text(
-              '과제 수행 내용',
+              '과제 내용',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -65,7 +42,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               controller: _contentController,
               maxLines: 10,
               decoration: InputDecoration(
-                hintText: '과제 수행 결과나 소감을 입력해주세요.',
+                hintText: '상담 과제 및 과제 실천 내용을 입력해 주세요',
                 hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
                 filled: true,
                 fillColor: const Color(0xFFF7F8FA),

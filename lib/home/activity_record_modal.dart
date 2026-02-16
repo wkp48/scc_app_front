@@ -740,13 +740,7 @@ class _ActivityRecordModalState extends State<ActivityRecordModal> {
       case 'WALK':
         return _buildDailyRecordInput();
       case 'POSITIVE_SELF':
-        return Column(
-          children: [
-            _buildTitleInput(readOnly: true, initialValue: '희망 리코딩'),
-            const SizedBox(height: 20),
-            _buildContentInput(),
-          ],
-        );
+        return _buildContentInput();
       case 'EMOTION_DIARY':
         return _buildEmotionDiaryInput();
       default:

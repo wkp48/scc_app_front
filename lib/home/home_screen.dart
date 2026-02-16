@@ -315,6 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchDashboardData() async {
     _fetchLatestNotice(); 
     _fetchDebtData(); 
+    _fetchMissions(); // Added: Fetch missions for the dashboard
     final response = await ApiService.getHomeDashboard(widget.userData['uid']);
     if (response['success'] == true) {
       if (mounted) {
@@ -1420,24 +1421,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Icon(Icons.chevron_right, color: Colors.grey),
               ],
             ),
-          const SizedBox(height: 20),
-          if (activeMissions.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text('부여된 과제가 없습니다.', style: TextStyle(color: Colors.grey, fontSize: 14)),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: activeMissions.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final mission = activeMissions[index];
-                
-                Color taskColor;
+            if (activeMissions.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: activeMissions.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 16),
+                itemBuilder: (context, index) {
+                  final mission = activeMissions[index];
+                  
+                  Color taskColor;
                 String statusText;
                 switch (mission['status']) {
                   case 'IN_PROGRESS':
@@ -1557,10 +1551,11 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ],
-        ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   // Added: Notice Preview Section
   Widget _buildNoticePreviewSection() {

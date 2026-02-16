@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'resolution_step.dart';
-import 'diagnosis_intro_step.dart';
-import 'diagnosis_step.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -41,20 +39,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ResolutionStep(
           userData: widget.userData,
           onNext: _nextPage,
-          onPrevious: _previousPage,
-        ),
-      );
-      
-      _pages.add(
-        DiagnosisIntroStep(
-          onNext: _nextPage,
-          onPrevious: _previousPage,
-        ),
-      );
-      _pages.add(
-        DiagnosisStep(
-          userData: widget.userData,
-          onNext: _completeOnboarding,
           onPrevious: _previousPage,
         ),
       );

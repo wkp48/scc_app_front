@@ -24,22 +24,43 @@ class ApiService {
 
     const publicUrl = 'http://39.123.252.131:8900/api';
     const localUrl = 'http://192.168.45.99:8900/api';
+    const simulatorUrl = 'http://10.0.2.2:8900/api';
 
+    _debugLog('=== [Network] Start Auto-Detection ===');
+
+    // 1. Android 시뮬레이터인 경우 10.0.2.2(호스트 PC) 최우선 테스트
+    // SSH 터널링(ssh -L 8900:localhost:8900) 사용 시 가장 확실한 방법입니다.
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        final uri = Uri.parse('$simulatorUrl/app/version/check?os=ANDROID');
+        _debugLog('>>> [Network] Testing Simulator Loopback: $uri');
+        await http.get(uri).timeout(const Duration(milliseconds: 1500));
+        
+        _debugLog('=== [Network] SUCCESS: Connected via Simulator Host ($simulatorUrl) ===');
+        _cachedBaseUrl = simulatorUrl;
+        return simulatorUrl;
+      } catch (e) {
+        _debugLog('>>> [Network] Simulator Loopback Failed: $e');
+      }
+    }
+
+    // 2. 내부망(Local) 직접 연결 테스트
     try {
-      // 1. 내부망(Local) 연결 테스트 (짧은 타임아웃)
-      // 앱 버전 체크 API를 가볍게 찔러봅니다.
-      await http.get(Uri.parse('$localUrl/app/version/check?os=android'))
-          .timeout(const Duration(milliseconds: 1000));
+      final uri = Uri.parse('$localUrl/app/version/check?os=ANDROID');
+      _debugLog('>>> [Network] Testing Direct Local: $uri');
+      await http.get(uri).timeout(const Duration(milliseconds: 3000));
       
-      _debugLog('=== [Network] Local Network Detected: $localUrl ===');
+      _debugLog('=== [Network] SUCCESS: Connected to Direct Local ($localUrl) ===');
       _cachedBaseUrl = localUrl;
       return localUrl;
     } catch (e) {
-      // 2. 실패 시 외부망(Public) 사용
-      _debugLog('=== [Network] Fallback to Public Network: $publicUrl ===');
-      _cachedBaseUrl = publicUrl;
-      return publicUrl;
+      _debugLog('>>> [Network] Direct Local Failed: $e');
     }
+
+    // 3. 마지막 수단: 외부망(Public)
+    _debugLog('=== [Network] FALLBACK: Using Public Network ($publicUrl) ===');
+    _cachedBaseUrl = publicUrl;
+    return publicUrl;
   }
   
   // 회원 탈퇴

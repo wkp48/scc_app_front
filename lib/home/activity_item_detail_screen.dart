@@ -166,12 +166,14 @@ class _ActivityItemDetailScreenState extends State<ActivityItemDetailScreen> {
                     ),
                     child: Icon(_getActivityIcon(), color: _getActivityColor(), size: 32),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    currentActivity['title'] ?? '제목 없음',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
-                  ),
+                  if (currentActivity['activityType'] != 'POSITIVE_SELF') ...[
+                    Text(
+                      currentActivity['title'] ?? '제목 없음',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   if (currentActivity['category'] != null || currentActivity['score'] != null) ...[
                     const SizedBox(height: 12),
                     Row(

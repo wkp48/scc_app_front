@@ -372,7 +372,8 @@ class _ActivityDetailsModalState extends State<ActivityDetailsModal> {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      Text(activity['title'] ?? '제목 없음', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      if (activity['activityType'] != 'POSITIVE_SELF')
+                        Text(activity['title'] ?? '제목 없음', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),

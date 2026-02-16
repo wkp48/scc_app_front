@@ -302,9 +302,9 @@ class _VoiceRecordScreenState extends State<VoiceRecordScreen> with SingleTicker
                 ),
               ),
               const SizedBox(width: 24),
-              // Stop/Reset Button
+              // [Changed] Stop icon changed to 'Save' label
               _buildControlButton(
-                icon: Icons.stop,
+                label: '저장',
                 onPressed: () {
                   if (_recordingPath != null) {
                     Navigator.pop(context, _recordingPath);
@@ -369,17 +369,31 @@ class _VoiceRecordScreenState extends State<VoiceRecordScreen> with SingleTicker
     );
   }
 
-  Widget _buildControlButton({required IconData icon, VoidCallback? onPressed, bool enabled = true}) {
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: enabled ? const Color(0xFFF1F4F7) : const Color(0xFFF8F9FA),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: enabled ? const Color(0xFF2D3E50) : Colors.grey[300]),
-        onPressed: onPressed,
+  Widget _buildControlButton({IconData? icon, String? label, VoidCallback? onPressed, bool enabled = true}) {
+    return GestureDetector(
+      onTap: enabled ? onPressed : null,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: enabled ? const Color(0xFFF1F4F7) : const Color(0xFFF8F9FA),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: label != null 
+            ? Text(
+                label, 
+                style: TextStyle(
+                  color: enabled ? const Color(0xFF2D3E50) : Colors.grey[300],
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              )
+            : Icon(
+                icon, 
+                color: enabled ? const Color(0xFF2D3E50) : Colors.grey[300],
+              ),
+        ),
       ),
     );
   }
