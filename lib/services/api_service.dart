@@ -62,6 +62,47 @@ class ApiService {
     _cachedBaseUrl = publicUrl;
     return publicUrl;
   }
+
+  // 절대 URL 생성 헬퍼
+  static String getAbsoluteUrl(String baseUrl, String path) {
+    if (path.isEmpty) return '';
+    if (path.startsWith('data:image')) return path;
+    
+    // 만약 이미 절대 경로(http)라면, 구버전의 하드코딩된 IP가 포함되어 있는지 확인하고 현재 baseUrl로 교체합니다.
+    if (path.startsWith('http')) {
+      final List<String> legacyIps = ['192.168.0.75', '115.20.138.8', '39.123.252.131', '192.168.45.99'];
+      bool hasLegacyIp = false;
+      for (var ip in legacyIps) {
+        if (path.contains(ip)) {
+          hasLegacyIp = true;
+          break;
+        }
+      }
+      
+      if (hasLegacyIp) {
+        int apiIndex = path.indexOf('/api');
+        if (apiIndex != -1) {
+          path = path.substring(apiIndex);
+          // path가 /api로 시작하게 되었으므로 아래 로직에서 처리됩니다.
+        } else {
+          return path;
+        }
+      } else {
+        return path;
+      }
+    }
+    
+    String url;
+    if (baseUrl.endsWith('/api') && path.startsWith('/api')) {
+      // baseUrl에 /api가 있고 path도 /api로 시작하면 중복 방지
+      url = baseUrl.substring(0, baseUrl.length - 4) + path;
+    } else if (!path.startsWith('/')) {
+      url = '$baseUrl/$path';
+    } else {
+      url = '$baseUrl$path';
+    }
+    return Uri.encodeFull(url);
+  }
   
   // 회원 탈퇴
   static Future<Map<String, dynamic>> withdrawMember(String uid) async {
@@ -1791,7 +1832,8 @@ class ApiService {
         };
       }
       // [Fix] 서버 주소 및 경로 강제 지정 (디버깅)
-      String url = 'http://115.20.138.8:8900/api/app/videos';
+      String bUrl = await baseUrl;
+      String url = '$bUrl/app/videos';
       if (category != null) {
         url += '?category=$category';
       }

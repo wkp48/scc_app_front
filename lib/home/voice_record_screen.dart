@@ -188,6 +188,13 @@ class _VoiceRecordScreenState extends State<VoiceRecordScreen> with SingleTicker
     return "$minutes:$seconds.$tenths";
   }
 
+  String _formatDurationSimple(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$minutes:$seconds";
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -311,7 +318,10 @@ class _VoiceRecordScreenState extends State<VoiceRecordScreen> with SingleTicker
                 label: '저장',
                 onPressed: () {
                   if (_recordingPath != null) {
-                    Navigator.pop(context, _recordingPath);
+                    Navigator.pop(context, {
+                      'path': _recordingPath,
+                      'duration': _formatDurationSimple(_duration),
+                    });
                   }
                 },
                 enabled: _recordingPath != null,

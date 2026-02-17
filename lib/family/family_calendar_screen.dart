@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../home/daily_checklist_card.dart';
+import '../home/activity_item_detail_screen.dart';
+import 'family_emotion_history_screen.dart';
+import 'family_emotion_detail_screen.dart';
 
 
 class FamilyCalendarScreen extends StatefulWidget {
@@ -23,10 +26,20 @@ class _FamilyCalendarScreenState extends State<FamilyCalendarScreen> with Single
   
   // Data: 'yyyy-MM-dd' -> {'principle': bool, 'daily': bool}
   Map<String, Map<String, bool>> _recordData = {}; 
+  
+  // [Added] Data for Dots: 'yyyy-MM-dd' -> List<String> types
+  Map<String, List<String>> _eventData = {}; 
+  // [Added] Cache for Anxiety Logs: Date -> List<AnxietyLog>
+  Map<String, List<dynamic>> _anxietyLogs = {}; 
+
   bool _isLoading = false;
 
   String? _resolutionDateRaw; // YYYY-MM-DD
   List<String> _restartDates = [];
+  
+  // [Added] Selected Day Detail Data
+  List<dynamic> _selectedDayActivities = [];
+  bool _isDetailLoading = false;
 
 
 
@@ -61,28 +74,93 @@ class _FamilyCalendarScreenState extends State<FamilyCalendarScreen> with Single
     setState(() => _isLoading = true);
     
     final uid = widget.userData!['uid'] ?? widget.userData!['userid']; // Fallback
-    final response = await ApiService.getFamilyDailyLogs(uid, _focusedDay.year, _focusedDay.month);
     
+    // 1. Fetch Daily Log Check (Principle/Daily)
+    final dailyLogResponse = await ApiService.getFamilyDailyLogs(uid, _focusedDay.year, _focusedDay.month);
+    
+    // 2. Fetch Activity Summary (for WALK logs)
+    final activitySummaryResponse = await ApiService.getMonthlyActivitySummary(uid, _focusedDay.year, _focusedDay.month);
+
+    // 3. Fetch Anxiety Logs (All time, filtering locally for now or optimize later)
+    final anxietyResponse = await ApiService.getAnxietyLogs(uid);
+
     if (mounted) {
-      if (response['success'] == true) {
-        final List<dynamic> logs = response['data'] ?? [];
-        final Map<String, Map<String, bool>> newData = {};
-        
+      // Process Daily Checklist Data
+      final Map<String, Map<String, bool>> newRecordData = {};
+      if (dailyLogResponse['success'] == true) {
+        final List<dynamic> logs = dailyLogResponse['data'] ?? [];
         for (var log in logs) {
-          // log: {date: "2023-01-01", principleCheck: true, dailyCheck: false}
           final date = log['date'] as String;
-          newData[date] = {
+          newRecordData[date] = {
             'principle': log['principleCheck'] ?? false,
             'daily': log['dailyCheck'] ?? false,
           };
         }
+      }
+
+      // Process Event Data for Dots
+      final Map<String, List<String>> newEventData = {};
+      
+      // Add WALK events
+      if (activitySummaryResponse['success'] == true) {
+        final List<dynamic> summary = activitySummaryResponse['data'] ?? [];
+        for (var item in summary) {
+          final date = item['date'] as String;
+          final types = List<String>.from(item['types'] ?? []);
+          if (types.contains('WALK')) {
+             newEventData.putIfAbsent(date, () => []).add('WALK');
+          }
+        }
+      }
+
+      // Process Anxiety Logs
+      final Map<String, List<dynamic>> newAnxietyLogs = {};
+      if (anxietyResponse['success'] == true) {
+        final List<dynamic> logs = anxietyResponse['data'] ?? [];
+        for (var log in logs) {
+          final createdAt = log['createdAt'] as String; // e.g. "2023-10-27T10:00:00"
+          final date = createdAt.split('T')[0];
+          newAnxietyLogs.putIfAbsent(date, () => []).add(log);
+          
+          if (!newEventData.containsKey(date) || !newEventData[date]!.contains('EMOTION_DIARY')) {
+             newEventData.putIfAbsent(date, () => []).add('EMOTION_DIARY');
+          }
+        }
+      }
+
+      setState(() {
+        _recordData = newRecordData;
+        _eventData = newEventData;
+        _anxietyLogs = newAnxietyLogs;
+        _isLoading = false;
+      });
+      
+      // Fetch details for the initially selected day
+      _fetchSelectedDayDetails();
+    }
+  }
+
+  Future<void> _fetchSelectedDayDetails() async {
+    if (widget.userData == null) return;
+    setState(() => _isDetailLoading = true);
+
+    final uid = widget.userData!['uid'] ?? widget.userData!['userid'];
+    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDay);
+
+    // Fetch Activities (WALK)
+    final response = await ApiService.getActivities(uid: uid, date: dateStr, type: 'WALK');
+    
+    if (mounted) {
+      if (response['success'] == true) {
         setState(() {
-          _recordData = newData;
-          _isLoading = false;
+          _selectedDayActivities = response['data'] ?? [];
+          _isDetailLoading = false;
         });
       } else {
-        setState(() => _isLoading = false);
-        // SnackBar?
+        setState(() {
+          _selectedDayActivities = [];
+          _isDetailLoading = false;
+        });
       }
     }
   }
@@ -205,7 +283,13 @@ class _FamilyCalendarScreenState extends State<FamilyCalendarScreen> with Single
                               ),
 
                               const SizedBox(height: 24),
+
+                              const SizedBox(height: 24),
                               _buildDailyCheckSection(),
+                              
+                              const SizedBox(height: 24),
+                              _buildActivityList(), // [Added] Activity List
+                              
                               const SizedBox(height: 100),
                             ],
                           ),
@@ -366,7 +450,7 @@ class _FamilyCalendarScreenState extends State<FamilyCalendarScreen> with Single
         GestureDetector(
           onTap: isFuture ? null : () {
             setState(() => _selectedDay = currentDay);
-
+            _fetchSelectedDayDetails(); // [Added] Fetch Details
           },
           child: Container(
             alignment: Alignment.center,
@@ -411,7 +495,6 @@ class _FamilyCalendarScreenState extends State<FamilyCalendarScreen> with Single
     // D-Day check
     final dateStr = DateFormat('yyyy-MM-dd').format(dayDate);
     final isInitial = dateStr == _resolutionDateRaw;
-    final isRestart = _restartDates.contains(dateStr);
     
     // Colors
     final principleColor = const Color(0xFFFFA940); // Orange
@@ -497,14 +580,61 @@ class _FamilyCalendarScreenState extends State<FamilyCalendarScreen> with Single
                   ),
                 ),
               ),
-            Text(
-              '${dayDate.day}',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? const Color(0xFF5C72EB) : textColor,
+            
+            if (!isFuture) // Only show text if not future or handled by style
+              Text(
+                '${dayDate.day}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? const Color(0xFF5C72EB) : textColor,
+                ),
               ),
-            ),
+
+            // [Modified] Bars for Events
+            if ((_eventData.containsKey(dateStr) && !isFuture) || isInitial)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    if (!isFuture && _eventData.containsKey(dateStr))
+                      ..._eventData[dateStr]!.take(3).map((type) {
+                        Color barColor = Colors.grey;
+                        String title = "";
+                        if (type == 'WALK') {
+                          barColor = const Color(0xFF52C41A);
+                          title = "일상";
+                        } else if (type == 'EMOTION_DIARY') {
+                          barColor = const Color(0xFF13C2C2);
+                          title = "감정";
+                        }
+                        
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 2),
+                          width: double.infinity,
+                          height: 4 + (_expansionAnimation.value * 12),
+                          decoration: BoxDecoration(
+                            color: barColor,
+                            borderRadius: BorderRadius.circular(2 + (_expansionAnimation.value * 1)),
+                          ),
+                          alignment: Alignment.center,
+                          child: _expansionAnimation.value > 0.7 
+                            ? Opacity(
+                                opacity: ((_expansionAnimation.value - 0.7) / 0.3).clamp(0.0, 1.0),
+                                child: Text(
+                                  title, 
+                                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ) 
+                            : const SizedBox.shrink(),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -616,4 +746,142 @@ class _FamilyCalendarScreenState extends State<FamilyCalendarScreen> with Single
 
 
 
+  // [Added] Build Activity List for Selected Day
+  Widget _buildActivityList() {
+    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDay);
+    final emotionLogs = _anxietyLogs[dateStr] ?? [];
+    final walkLogs = _selectedDayActivities; // Already fetched for selected day
+
+    if (emotionLogs.isEmpty && walkLogs.isEmpty) {
+        if (_isDetailLoading) {
+            return const Center(child: CircularProgressIndicator());
+        }
+        return const SizedBox(); // No logs
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '오늘의 기록',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+        ),
+        const SizedBox(height: 16),
+        
+        // Render Walk Logs
+        ...walkLogs.map((log) => _buildLogCard(
+          type: 'WALK',
+          data: log,
+          onTap: () async {
+             // Navigate to Detail
+             // Since we already have ActivityItemDetailScreen, we can reuse it
+             // But we need to make sure the data format matches
+             await Navigator.push(
+               context,
+               MaterialPageRoute(
+                 builder: (context) => ActivityItemDetailScreen(
+                   activity: log,
+                   userData: widget.userData!,
+                 ),
+               ),
+             );
+             _fetchSelectedDayDetails(); // Refresh on back
+             _fetchMonthlyData();
+          }
+        )),
+
+        // Render Emotion Logs
+        ...emotionLogs.map((log) => _buildLogCard(
+          type: 'EMOTION_DIARY',
+          data: log,
+          onTap: () {
+             // Open FamilyEmotionDetailScreen directly
+             Navigator.push(
+               context,
+               MaterialPageRoute(
+                 builder: (context) => FamilyEmotionDetailScreen(log: log),
+               ),
+             );
+          }
+        )),
+      ],
+    );
+  }
+
+  Widget _buildLogCard({
+    required String type,
+    required Map<String, dynamic> data,
+    required VoidCallback onTap,
+  }) {
+    IconData icon;
+    Color color;
+    String title;
+    String content;
+    String time;
+
+    if (type == 'WALK') {
+      icon = Icons.wb_sunny_outlined;
+      color = const Color(0xFF52C41A);
+      title = data['title'] ?? '일상기록';
+      content = data['content'] ?? '';
+      time = data['startTime'] != null ? data['startTime'].substring(0, 5) : '';
+    } else {
+      icon = Icons.edit_note_rounded;
+      color = const Color(0xFF13C2C2);
+      title = '감정일기';
+      content = data['situation'] ?? ''; // Display situation as summary
+      time = data['createdAt'] != null ? data['createdAt'].split('T')[1].substring(0, 5) : '';
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+             BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(time, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    ],
+                  ),
+                  if (content.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      content,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

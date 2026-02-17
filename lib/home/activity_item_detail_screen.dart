@@ -44,23 +44,8 @@ class _ActivityItemDetailScreenState extends State<ActivityItemDetailScreen> {
     super.dispose();
   }
 
-  String _getAbsoluteUrl(String path) {
-    if (path.isEmpty) return '';
-    if (path.startsWith('data:image')) return path;
-    if (path.startsWith('http')) return path;
-    
-    // 기본 베이스 URL
-    const String effectiveBaseUrl = 'http://192.168.0.75:8900/api';
-    
-    String url;
-    if (path.startsWith('/api')) {
-      url = effectiveBaseUrl.substring(0, effectiveBaseUrl.length - 4) + path;
-    } else if (!path.startsWith('/')) {
-      url = '$effectiveBaseUrl/$path';
-    } else {
-      url = '$effectiveBaseUrl$path';
-    }
-    return Uri.encodeFull(url);
+  String _getAbsoluteUrl(String path, String baseUrl) {
+    return ApiService.getAbsoluteUrl(baseUrl, path);
   }
 
   String _getActivityTitle() {
@@ -303,20 +288,50 @@ class _ActivityItemDetailScreenState extends State<ActivityItemDetailScreen> {
                     const SizedBox(height: 16),
                     SizedBox(
                       height: 200,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: imageUrls.length,
-                        itemBuilder: (context, index) => Container(
-                          margin: const EdgeInsets.only(right: 12),
-                          width: 150,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            image: DecorationImage(
-                              image: NetworkImage(_getAbsoluteUrl(imageUrls[index])),
-                              fit: BoxFit.cover,
+                      child: FutureBuilder<String>(
+                        future: ApiService.baseUrl,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: imageUrls.length,
+                              itemBuilder: (context, index) => Container(
+                                margin: const EdgeInsets.only(right: 12),
+                                width: 150,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            );
+                          }
+                          final baseUrl = snapshot.data!;
+                          return ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: imageUrls.length,
+                            itemBuilder: (context, index) => Container(
+                              margin: const EdgeInsets.only(right: 12),
+                              width: 150,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.network(
+                                  _getAbsoluteUrl(imageUrls[index], baseUrl),
+                                  fit: BoxFit.cover,
+                                  headers: {'X-User-Uid': widget.userData['uid'] ?? ''},
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: Icon(Icons.broken_image, color: Colors.grey, size: 32),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        }
                       ),
                     ),
                   ],

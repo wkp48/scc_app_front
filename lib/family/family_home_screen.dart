@@ -15,6 +15,8 @@ import 'positive_checklist_screen.dart';
 import 'package:kcgp_cb/home/profile_screen.dart';
 import 'package:kcgp_cb/home/daily_checklist_card.dart';
 import 'package:kcgp_cb/home/widgets/recovery_trend_card.dart';
+import 'package:kcgp_cb/home/daily_checklist_modal.dart';
+import 'pre_conversation_checklist_modal.dart';
 
 
 
@@ -40,12 +42,14 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
   Map<String, dynamic>? _latestNotice;
   String? _baseUrl;
   Map<String, dynamic>? _pendingMaximData;
+  List<int>? _checklistScores; // Added for checklist results
   
   // Tutorial Keys
   final GlobalKey _dDayCardKey = GlobalKey();
   final GlobalKey _positiveChecklistKey = GlobalKey();
 
   final GlobalKey _navTrainingKey = GlobalKey();
+  final GlobalKey<DailyChecklistCardState> _checklistCardKey = GlobalKey();
 
 
   @override
@@ -57,6 +61,7 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
     _setupMaximNotificationListener();
     NotificationService().registerUserToken(widget.userData['uid']);
     _initTutorial();
+    _checkAndShowDailyChecklist();
   }
 
   void _initTutorial({bool force = false}) {
@@ -231,6 +236,30 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
     }
   }
 
+  Future<void> _checkAndShowDailyChecklist() async {
+    // 보호자(FAMILY) 또는 관리자(ADMIN)인 경우에만 표시
+    if (widget.userData['userType'] != 'FAMILY' && widget.userData['userType'] != 'ADMIN') return;
+
+    final checkResult = await ApiService.checkTodayDailyChecklist(widget.userData['uid']);
+    if (checkResult['success'] == true && checkResult['data'] == false) {
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false, // 강제로 작성하도록 유도
+          builder: (context) => DailyChecklistModal(
+            userData: widget.userData, 
+            checklistType: 'FAMILY',
+          ),
+        ).then((result) {
+          if (result == true) {
+            _fetchDashboardData();
+            _checklistCardKey.currentState?.refresh();
+          }
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 탭 화면들
@@ -302,6 +331,7 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
             ),
             const SizedBox(height: 24),
             DailyChecklistCard(
+              key: _checklistCardKey,
               userData: widget.userData,
               checklistType: 'FAMILY',
               customTitle: '나의 성장 상태',
@@ -311,6 +341,8 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
             ),
             const SizedBox(height: 24),
             _buildQuickAccessGrid(),
+            const SizedBox(height: 16),
+            _buildPreConversationChecklistButton(),
             const SizedBox(height: 24),
             _buildNoticePreviewSection(),
             const SizedBox(height: 24),
@@ -643,6 +675,186 @@ class _FamilyHomeScreenState extends State<FamilyHomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+
+
+  Widget _buildPreConversationChecklistButton() {
+    return GestureDetector(
+      onTap: () async {
+        final result = await showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => const PreConversationChecklistModal(),
+        );
+
+        if (result != null && result is List<int>) {
+           setState(() {
+             _checklistScores = result;
+           });
+        }
+      },
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF5C72EB).withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(color: const Color(0xFFADC6FF).withOpacity(0.5)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F5FF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.checklist_rounded, color: Color(0xFF5C72EB), size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '대화전 체크리스트',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F1F1F),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _checklistScores != null ? '진단 완료' : '대상자와 대화하기 전 체크해보세요',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Icon(
+                  _checklistScores != null ? Icons.check_circle : Icons.arrow_forward_ios_rounded, 
+                  size: _checklistScores != null ? 24 : 16, 
+                  color: _checklistScores != null ? const Color(0xFF5C72EB) : Colors.grey
+                ),
+              ],
+            ),
+          ),
+          if (_checklistScores != null) ...[
+            const SizedBox(height: 16),
+            _buildChecklistResults(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChecklistResults() {
+    final List<String> questions = [
+      '난 평안한 상태에 있나요?',
+      '내 과제와 대상자의 과제를 명확히 구분하고 있나요?',
+      '진심으로 대상자의 성장과 안녕을 희망하고 있나요?',
+      '도박문제 치료목적을 최우선 순위에 놓고 있나요?',
+      '지금 나의 말과 행동은 원칙에 부합한가요?',
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('진단 결과', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          ...List.generate(questions.length, (index) {
+            final score = _checklistScores![index];
+            final isWarning = score <= 7;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                   Container(
+                     width: 24, height: 24,
+                     alignment: Alignment.center,
+                     decoration: BoxDecoration(
+                       color: isWarning ? const Color(0xFFFF4D4F).withOpacity(0.1) : const Color(0xFF5C72EB).withOpacity(0.1),
+                       shape: BoxShape.circle,
+                     ),
+                     child: Text(
+                       '${index + 1}',
+                       style: TextStyle(
+                         color: isWarning ? const Color(0xFFFF4D4F) : const Color(0xFF5C72EB),
+                         fontWeight: FontWeight.bold,
+                         fontSize: 12,
+                       ),
+                     ),
+                   ),
+                   const SizedBox(width: 12),
+                   Expanded(
+                     child: Text(
+                       questions[index],
+                       style: const TextStyle(fontSize: 14, color: Colors.black87),
+                       maxLines: 2,
+                       overflow: TextOverflow.ellipsis,
+                     ),
+                   ),
+                   const SizedBox(width: 8),
+                   Text(
+                     '$score점',
+                     style: TextStyle(
+                       fontWeight: FontWeight.bold,
+                       color: isWarning ? const Color(0xFFFF4D4F) : const Color(0xFF5C72EB),
+                     ),
+                   ),
+                ],
+              ),
+            );
+          }),
+          if (_checklistScores!.any((score) => score <= 7))
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Color(0xFFFF4D4F)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '자기점검 결과, 붉은색으로 표기된 문항이 있다면 대상자와의 대화를 다음으로 미뤄주세요',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: const Color(0xFFFF4D4F),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

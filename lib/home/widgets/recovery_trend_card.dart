@@ -30,15 +30,21 @@ class _RecoveryTrendCardState extends State<RecoveryTrendCard> {
   // Colors matching the photo dots
   final Map<String, Color> _categoryColors = {
     // Personal Recovery (RECOVERY)
-    '신체지표': const Color(0xFF5C72EB), // Blue
-    '정서지표': const Color(0xFF4CAF50), // Green
-    '사고지표': const Color(0xFFFF9800), // Orange
-    '대인관계지표': const Color(0xFF9C27B0), // Purple
+    '신체지표': const Color(0xFF5C72EB),
+    '신체 지표': const Color(0xFF5C72EB),
+    '정서지표': const Color(0xFF4CAF50),
+    '정서 지표': const Color(0xFF4CAF50),
+    '사고지표': const Color(0xFFFF9800),
+    '사고 지표': const Color(0xFFFF9800),
+    '사고': const Color(0xFFFF9800),
+    '대인관계지표': const Color(0xFF9C27B0),
+    '대인관계 지표': const Color(0xFF9C27B0),
+    '대인': const Color(0xFF9C27B0),
     // Family Roles (ROLE)
-    '재정관리': const Color(0xFF795548), // Brown
-    '통제욕구': const Color(0xFFE91E63), // Pink
-    '건강한대화': const Color(0xFF00BCD4), // Cyan
-    '건강한피드백': const Color(0xFF607D8B), // Blue Grey
+    '재정관리': const Color(0xFF795548),
+    '통제욕구': const Color(0xFFE91E63),
+    '건강한대화': const Color(0xFF00BCD4),
+    '건강한피드백': const Color(0xFF607D8B),
   };
 
   @override
@@ -46,6 +52,17 @@ class _RecoveryTrendCardState extends State<RecoveryTrendCard> {
     super.initState();
     _fetchHistory();
   }
+
+  @override
+  void didUpdateWidget(RecoveryTrendCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.userData['uid'] != oldWidget.userData['uid']) {
+      _fetchHistory();
+    }
+  }
+
+  // Public method to refresh data
+  void refresh() => _fetchHistory();
 
   Future<void> _fetchHistory() async {
     final uid = widget.userData['uid'] ?? widget.userData['userid'];
@@ -73,7 +90,8 @@ class _RecoveryTrendCardState extends State<RecoveryTrendCard> {
 
     return Column(
       children: [
-        const Divider(height: 1, color: Color(0xFFF0F0F0)),
+        if (!widget.isEmbedded)
+          const Divider(height: 1, color: Color(0xFFF0F0F0)),
         InkWell(
           onTap: () => setState(() => _isExpanded = !_isExpanded),
           child: Padding(
@@ -127,10 +145,13 @@ class _RecoveryTrendCardState extends State<RecoveryTrendCard> {
             spacing: 12,
             runSpacing: 8,
             children: currentCategories.map((cat) {
-              String label = cat.replaceAll('지표', '').replaceAll('건강한 ', '');
+              String label = cat.replaceAll('지표', '').replaceAll('건강한 ', '').trim();
               if (label == '대인관계') label = '대인';
-              return _buildLegendDot(label, _categoryColors[cat] ?? Colors.grey);
-            }).toList(),
+              return MapEntry(label, _categoryColors[cat] ?? Colors.grey);
+            }).fold<Map<String, Color>>({}, (map, entry) {
+              map[entry.key] = entry.value;
+              return map;
+            }).entries.map((e) => _buildLegendDot(e.key, e.value)).toList(),
           ),
         ),
         // Chart
@@ -204,6 +225,7 @@ class _RecoveryTrendCardState extends State<RecoveryTrendCard> {
         ? ['재정관리', '통제욕구', '건강한대화', '건강한피드백']
         : ['신체지표', '정서지표', '사고지표', '대인관계지표'];
     }
+    // Return simple keys, matching will be handled flexibly
     return ['신체지표', '정서지표', '사고지표', '대인관계지표'];
   }
 
@@ -275,29 +297,48 @@ class _RecoveryTrendCardState extends State<RecoveryTrendCard> {
       minX: 0,
       maxX: (_historyData.length - 1).toDouble(),
       minY: 0,
-      maxY: widget.checklistType == 'FAMILY' ? 11 : 21,
+      maxY: widget.checklistType == 'PATIENT' ? 10 : 11,
       lineBarsData: categories.map((cat) {
         return LineChartBarData(
+          show: true,
           spots: List.generate(_historyData.length, (i) {
-            final scores = _historyData[i]['scores'] as Map;
+            final Map scores = _historyData[i]['scores'] ?? {};
             double score = 0;
-            if (scores[cat] != null) score = (scores[cat] as num).toDouble();
-            else if (scores[cat.replaceAll('지표', ' 지표')] != null) score = (scores[cat.replaceAll('지표', ' 지표')] as num).toDouble();
-            else if (cat == '건강한대화' && scores['건강한대화'] != null) score = (scores['건강한대화'] as num).toDouble();
-            else if (cat == '건강한피드백' && scores['건강한피드백'] != null) score = (scores['건강한피드백'] as num).toDouble();
             
-            return FlSpot(i.toDouble(), widget.checklistType == 'FAMILY' ? score : score * 2);
+            // Very aggressive matching
+            dynamic raw;
+            String search = cat.replaceAll('지표', '').replaceAll(' ', '').trim();
+            
+            // Try exact, then space inserted, then suffix added
+            raw = scores[cat] ?? 
+                  scores[cat.replaceAll('지표', ' 지표')] ??
+                  scores[search] ??
+                  scores['$search 지표'] ??
+                  scores['${search}지표'];
+
+            // Substring fallback
+            if (raw == null) {
+              for (var key in scores.keys) {
+                if (key.toString().replaceAll(' ', '').contains(search)) {
+                  raw = scores[key];
+                  break;
+                }
+              }
+            }
+
+            if (raw != null) score = (raw as num).toDouble();
+            return FlSpot(i.toDouble(), score);
           }),
           isCurved: true,
-          color: _categoryColors[cat] ?? Colors.blue,
+          color: _categoryColors[cat] ?? _categoryColors[cat.replaceAll('지표', ' 지표')] ?? Colors.blue,
           barWidth: 3,
           isStrokeCapRound: true,
           dotData: FlDotData(
             show: true,
             getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-              radius: 3,
-              color: _categoryColors[cat] ?? Colors.blue,
-              strokeWidth: 1,
+              radius: 4,
+              color: barData.color ?? Colors.blue,
+              strokeWidth: 2,
               strokeColor: Colors.white,
             ),
           ),

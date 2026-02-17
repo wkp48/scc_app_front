@@ -122,7 +122,7 @@ class _SelfDevelopmentScreenState extends State<SelfDevelopmentScreen> {
             color: const Color(0xFFF8942E),
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              padding: const EdgeInsets.fromLTRB(24, 40, 24, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

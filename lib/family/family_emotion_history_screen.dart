@@ -1,27 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
+import 'family_emotion_detail_screen.dart';
 
 class FamilyEmotionDetailsModal extends StatefulWidget {
   final Map<String, dynamic> userData;
-  final String? initialDate;
+
   final VoidCallback? onRefresh;
 
   const FamilyEmotionDetailsModal({
     super.key,
     required this.userData,
-    this.initialDate,
     this.onRefresh,
   });
 
-  static void show(BuildContext context, Map<String, dynamic> userData, {String? date, VoidCallback? onRefresh}) {
+  static void show(BuildContext context, Map<String, dynamic> userData, {VoidCallback? onRefresh}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => FamilyEmotionDetailsModal(
         userData: userData,
-        initialDate: date,
         onRefresh: onRefresh,
       ),
     );
@@ -32,17 +31,13 @@ class FamilyEmotionDetailsModal extends StatefulWidget {
 }
 
 class _FamilyEmotionDetailsModalState extends State<FamilyEmotionDetailsModal> {
-  bool _isAllView = false;
-  late DateTime _selectedDate;
+
   List<dynamic> _logs = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = widget.initialDate != null 
-        ? DateTime.parse(widget.initialDate!) 
-        : DateTime.now();
     _fetchLogs();
   }
 
@@ -57,15 +52,6 @@ class _FamilyEmotionDetailsModalState extends State<FamilyEmotionDetailsModal> {
     if (mounted) {
       if (response['success'] == true) {
         List<dynamic> allLogs = response['data'] ?? [];
-        
-        // Filter by date if needed
-        if (!_isAllView) {
-          final targetDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
-          allLogs = allLogs.where((log) {
-            String created = log['createdAt'] ?? '';
-            return created.startsWith(targetDate);
-          }).toList();
-        }
         
         // Sort DESC
         allLogs.sort((a, b) {
@@ -103,49 +89,7 @@ class _FamilyEmotionDetailsModalState extends State<FamilyEmotionDetailsModal> {
     return Uri.encodeFull(url);
   }
 
-  void _nextDate() {
-    setState(() {
-      _selectedDate = _selectedDate.add(const Duration(days: 1));
-      _isAllView = false;
-    });
-    _fetchLogs();
-  }
 
-  void _prevDate() {
-    setState(() {
-      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
-      _isAllView = false;
-    });
-    _fetchLogs();
-  }
-
-  Future<void> _showDatePicker() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      locale: const Locale('ko', 'KR'),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF13C2C2), // Cyan for Emotion Diary
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-      _fetchLogs();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -159,8 +103,6 @@ class _FamilyEmotionDetailsModalState extends State<FamilyEmotionDetailsModal> {
         children: [
           _buildHeader(),
           const SizedBox(height: 16),
-          _buildToggleButtons(),
-          if (!_isAllView) _buildDateNavigation(),
            Expanded(
             child: _isLoading 
                 ? const Center(child: CircularProgressIndicator())
@@ -192,111 +134,7 @@ class _FamilyEmotionDetailsModalState extends State<FamilyEmotionDetailsModal> {
     );
   }
 
-  Widget _buildToggleButtons() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEEEEE),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                if (_isAllView) {
-                  setState(() {
-                    _isAllView = false;
-                    _fetchLogs();
-                  });
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: !_isAllView ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: !_isAllView ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))] : null,
-                ),
-                child: Center(
-                  child: Text(
-                    '일자별',
-                    style: TextStyle(
-                      color: !_isAllView ? Colors.black : Colors.grey,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                if (!_isAllView) {
-                  setState(() {
-                    _isAllView = true;
-                    _fetchLogs();
-                  });
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: _isAllView ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: _isAllView ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))] : null,
-                ),
-                child: Center(
-                  child: Text(
-                    '전체',
-                    style: TextStyle(
-                      color: _isAllView ? Colors.black : Colors.grey,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildDateNavigation() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            onPressed: _prevDate,
-            icon: const Icon(Icons.chevron_left, color: Colors.grey, size: 28),
-          ),
-          const SizedBox(width: 20),
-          GestureDetector(
-            onTap: _showDatePicker,
-            child: Text(
-              DateFormat('yyyy/MM/dd').format(_selectedDate),
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF1F1F1F),
-                letterSpacing: -0.5,
-              ),
-            ),
-          ),
-          const SizedBox(width: 20),
-          IconButton(
-            onPressed: _nextDate,
-            icon: const Icon(Icons.chevron_right, color: Colors.grey, size: 28),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildLogList() {
     return ListView.builder(
@@ -453,134 +291,9 @@ class _FamilyEmotionDetailsModalState extends State<FamilyEmotionDetailsModal> {
     // I will use _EmotionItemDetailScreen (similar to ActivityItemDetailScreen)
     Navigator.push(
       context, 
-      MaterialPageRoute(builder: (_) => _EmotionItemDetailScreen(log: log))
+      MaterialPageRoute(builder: (_) => FamilyEmotionDetailScreen(log: log))
     );
   }
 }
 
-class _EmotionItemDetailScreen extends StatelessWidget {
-   final dynamic log;
-   const _EmotionItemDetailScreen({Key? key, required this.log}) : super(key: key);
 
-   String _getAbsoluteUrl(String path) {
-    if (path.isEmpty) return '';
-    if (path.startsWith('data:image')) return path;
-    if (path.startsWith('http')) return path;
-    const String effectiveBaseUrl = 'http://115.20.138.8:8900/api'; 
-    String url;
-    if (path.startsWith('/api')) {
-      url = effectiveBaseUrl.substring(0, effectiveBaseUrl.length - 4) + path;
-    } else if (!path.startsWith('/')) {
-      url = '$effectiveBaseUrl/$path';
-    } else {
-      url = '$effectiveBaseUrl$path';
-    }
-    return Uri.encodeFull(url);
-  }
-
-   @override
-   Widget build(BuildContext context) {
-      final List<dynamic> imageUrls = log['imageUrls'] ?? [];
-
-      return Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          foregroundColor: Colors.black,
-          title: const Text('감정일기 상세'),
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-               if (imageUrls.isNotEmpty) ...[
-                  SizedBox(
-                    height: 250,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: imageUrls.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Image.network(
-                              _getAbsoluteUrl(imageUrls[index]),
-                              width: MediaQuery.of(context).size.width * 0.8,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-               ],
-               
-               _buildSection('상황', log['situation']),
-               
-               const SizedBox(height: 24),
-               const Text('감정 점수', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-               const SizedBox(height: 12),
-               Wrap(
-                 spacing: 8, runSpacing: 8,
-                 children: [
-                   if (log['angerScore'] != null) _buildDetailScore('분노', log['angerScore'], const Color(0xFFFF4D4F)),
-                   if (log['anxietyScore'] != null) _buildDetailScore('불안', log['anxietyScore'], const Color(0xFF722ED1)),
-                   if (log['depressionScore'] != null) _buildDetailScore('우울', log['depressionScore'], const Color(0xFF1890FF)),
-                   if (log['hasteScore'] != null) _buildDetailScore('조급함', log['hasteScore'], const Color(0xFFFA8C16)),
-                 ],
-               ),
-               
-               const SizedBox(height: 24),
-               _buildSection('자동적 사고', log['thought']),
-               _buildSection('반박하기', log['rebuttal']),
-               _buildSection('상황 종료 후 나의 감정', log['aftermath']), // Question 5
-            ],
-          ),
-        ),
-      );
-   }
-
-   Widget _buildDetailScore(String label, dynamic score, Color color) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 4),
-            Text('$score점', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
-        ),
-      );
-   }
-
-   Widget _buildSection(String title, String? content) {
-      if (content == null || content.isEmpty) return const SizedBox.shrink();
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 20),
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFEEEEEE)),
-            ),
-            child: Text(content, style: const TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF424242))),
-          ),
-        ],
-      );
-   }
-}

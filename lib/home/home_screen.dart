@@ -43,7 +43,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isLoading = true;
   Map<String, dynamic>? _dashboardData;
   List<dynamic> _missions = [];
@@ -53,6 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   String? _baseUrl;
+  String? _selectedVoicePath;
+  String? _selectedVoiceDate;
+  late AnimationController _speakerController;
+  late AnimationController _progressController;
   final GlobalKey<DailyChecklistCardState> _checklistCardKey = GlobalKey();
 
   Map<String, dynamic>? _debtData;
@@ -86,13 +90,32 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Initialize controllers first to avoid LateInitializationError during build
+    _speakerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+      lowerBound: 0.8,
+      upperBound: 1.0,
+    )..value = 1.0;
+
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        HapticFeedback.heavyImpact();
+        _showVoiceHistorySheet();
+        _progressController.reset();
+        _speakerController.forward();
+      }
+    });
+
     _fetchDashboardData();
     _fetchLatestNotice();
     _fetchDebtData();
     _fetchBaseUrl();
     _checkAndShowAttendanceDialog();
-    NotificationService().registerUserToken(widget.userData['uid']);
-    _setupMaximNotificationListener();
     NotificationService().registerUserToken(widget.userData['uid']);
     _setupMaximNotificationListener();
     _initTutorial();
@@ -247,21 +270,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   
   String _getAbsoluteUrl(String path) {
-    if (path.startsWith('data:image')) return path;
-    if (path.startsWith('http')) return path;
-    
-    
-    final String effectiveBaseUrl = _baseUrl ?? 'http://192.168.0.75:8900/api';
-    
-    String url;
-    if (effectiveBaseUrl.endsWith('/api') && path.startsWith('/api')) {
-      url = effectiveBaseUrl.substring(0, effectiveBaseUrl.length - 4) + path;
-    } else if (!path.startsWith('/')) {
-      url = '$effectiveBaseUrl/$path';
-    } else {
-      url = '$effectiveBaseUrl$path';
+    if (_baseUrl == null) {
+      if (path.startsWith('data:image')) return path;
+      if (path.startsWith('http')) return path;
+      // Fallback relative construction if baseUrl not yet loaded
+      return path;
     }
-    return Uri.encodeFull(url);
+    return ApiService.getAbsoluteUrl(_baseUrl!, path);
   }
 
   Future<void> _checkAndShowAttendanceDialog() async {
@@ -341,6 +356,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _speakerController.dispose();
+    _progressController.dispose();
     super.dispose();
   }
 
@@ -351,37 +368,68 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final response = await ApiService.getLatestVoiceRecord(
-      widget.userData['uid'], 
-      'POSITIVE_SELF'
-    );
+    String? voicePath = _selectedVoicePath;
+    String? displayDate = _selectedVoiceDate;
 
-    if (response['success'] == true && response['data'] != null) {
-      final voicePath = response['data']['voiceFilePath'];
-      if (voicePath != null) {
-        final url = '${await ApiService.baseUrl}/activities/images/$voicePath';
-        try {
-          setState(() => _isPlaying = true);
-          await _audioPlayer.play(UrlSource(url));
-          _audioPlayer.onPlayerComplete.listen((event) {
-            if (mounted) setState(() => _isPlaying = false);
-          });
-        } catch (e) {
-          if (mounted) {
-            ToastUtils.show(context, '음성 재생 중 오류가 발생했습니다.');
-            setState(() => _isPlaying = false);
-          }
+    if (voicePath == null) {
+      final response = await ApiService.getLatestVoiceRecord(
+        widget.userData['uid'], 
+        'POSITIVE_SELF'
+      );
+
+      if (response['success'] == true && response['data'] != null) {
+        voicePath = response['data']['voiceFilePath'];
+        displayDate = response['data']['date'];
+      }
+    }
+
+    if (voicePath != null) {
+      final baseUrl = await ApiService.baseUrl;
+      final url = '$baseUrl/activities/images/$voicePath';
+      try {
+        if (displayDate != null) {
+          ToastUtils.show(context, '$displayDate의 희망 리코딩을 재생합니다.');
         }
-      } else {
+        setState(() => _isPlaying = true);
+        await _audioPlayer.play(UrlSource(url));
+        _audioPlayer.onPlayerComplete.listen((event) {
+          if (mounted) setState(() => _isPlaying = false);
+        });
+      } catch (e) {
         if (mounted) {
-          ToastUtils.show(context, '최근 녹음된 희망 리코딩이 없습니다.');
+          ToastUtils.show(context, '음성 재생 중 오류가 발생했습니다.');
+          setState(() => _isPlaying = false);
         }
       }
     } else {
       if (mounted) {
-        ToastUtils.show(context, '녹음된 파일을 찾을 수 없습니다.');
+        ToastUtils.show(context, '녹음된 희망 리코딩이 없습니다.');
       }
     }
+  }
+
+  void _showVoiceHistorySheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _VoiceHistoryBottomSheet(
+        userData: widget.userData,
+        selectedVoicePath: _selectedVoicePath,
+        onSelect: (path, date) {
+          setState(() {
+            _selectedVoicePath = path;
+            _selectedVoiceDate = date;
+          });
+          // 선택 후 즉시 재생
+          if (_isPlaying) {
+            _audioPlayer.stop().then((_) => _playLatestPositiveSelfVoice());
+          } else {
+            _playLatestPositiveSelfVoice();
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _selectResolutionDate() async {
@@ -613,7 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSubjectHomeContent() {
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+        padding: const EdgeInsets.fromLTRB(24.0, 32.0, 24.0, 20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -704,6 +752,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               width: 48,
                               height: 48,
                               fit: BoxFit.cover,
+                              headers: {'X-User-Uid': widget.userData['uid'] ?? ''},
                               errorBuilder: (context, error, stackTrace) => 
                                   const Icon(Icons.person, color: Colors.grey),
                             );
@@ -2354,14 +2403,59 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildNavIcon(Icons.home, _currentIndex == 0, 0),
           // 두 번째 위치로 이동한 스피커 버튼
-          IconButton(
-            onPressed: _playLatestPositiveSelfVoice,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            icon: Icon(
-              _isPlaying ? Icons.stop : Icons.volume_up,
-              color: _isPlaying ? const Color(0xFFFF4D4F) : const Color(0xFFBFBFBF),
-              size: 28,
+          // 두 번째 위치 스피커 버튼 (탭: 재생/정지, 길게 누르기: 원 애니메이션 후 목록)
+          GestureDetector(
+            onLongPressStart: (_) {
+              _speakerController.reverse(); // 축소
+              _progressController.forward(); // 원 채우기 시작
+              HapticFeedback.lightImpact();
+            },
+            onLongPressEnd: (_) {
+              if (_progressController.status != AnimationStatus.completed) {
+                _progressController.reverse();
+                _speakerController.forward();
+              }
+            },
+            onLongPressCancel: () {
+              _progressController.reverse();
+              _speakerController.forward();
+            },
+            onTapDown: (_) => _speakerController.animateTo(0.9),
+            onTapUp: (_) => _speakerController.forward(),
+            onTapCancel: () => _speakerController.forward(),
+            onTap: _playLatestPositiveSelfVoice,
+            child: ScaleTransition(
+              scale: _speakerController,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // 테두리 진행 원
+                  AnimatedBuilder(
+                    animation: _progressController,
+                    builder: (context, child) {
+                      return SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: CustomPaint(
+                          painter: _ProgressCirclePainter(
+                            progress: _progressController.value,
+                            color: const Color(0xFF5C72EB),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // 아이콘
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      _isPlaying ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded,
+                      color: _isPlaying ? const Color(0xFFFF4D4F) : const Color(0xFF5C72EB),
+                      size: 32,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 48),
@@ -2703,3 +2797,186 @@ class _ResolutionHistoryBottomSheetState extends State<_ResolutionHistoryBottomS
     }
   }
 }
+
+class _VoiceHistoryBottomSheet extends StatefulWidget {
+  final Map<String, dynamic> userData;
+  final String? selectedVoicePath;
+  final Function(String, String) onSelect;
+
+  const _VoiceHistoryBottomSheet({
+    Key? key,
+    required this.userData,
+    this.selectedVoicePath,
+    required this.onSelect,
+  }) : super(key: key);
+
+  @override
+  State<_VoiceHistoryBottomSheet> createState() => _VoiceHistoryBottomSheetState();
+}
+
+class _VoiceHistoryBottomSheetState extends State<_VoiceHistoryBottomSheet> {
+  bool _isLoading = true;
+  List<dynamic> _voiceHistory = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final response = await ApiService.getActivities(
+        uid: widget.userData['uid'],
+        type: 'POSITIVE_SELF',
+      );
+      if (mounted && response['success']) {
+        final List<dynamic> all = response['data'] ?? [];
+        // 음성 파일이 있는 것만 필터링
+        setState(() {
+          _voiceHistory = all.where((item) => item['voiceFilePath'] != null).toList();
+          _isLoading = false;
+        });
+      } else {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            '희망 리코딩 히스토리',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1F1F1F)),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '재생할 다짐을 선택해 보세요.',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+          const SizedBox(height: 24),
+          if (_isLoading)
+            const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator(color: Color(0xFF5C72EB))))
+          else if (_voiceHistory.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('녹음된 기록이 없습니다.', style: TextStyle(color: Colors.grey))))
+          else
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _voiceHistory.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final item = _voiceHistory[index];
+                  final path = item['voiceFilePath'];
+                  final date = item['date'] ?? '-';
+                  // endTime에 저장된 재생 길이(mm:ss)를 우선 표시, 없으면 startTime 표시
+                  final String? duration = item['endTime'];
+                  final String startTime = item['startTime']?.substring(0, 5) ?? '';
+                  final String displayTime = (duration != null && duration.isNotEmpty) 
+                      ? '재생 길이 $duration' 
+                      : '녹음 시간 $startTime';
+                  final isSelected = widget.selectedVoicePath == path;
+
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF5C72EB) : const Color(0xFFF0F5FF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.mic_none_rounded, 
+                        color: isSelected ? Colors.white : const Color(0xFF5C72EB), 
+                        size: 22
+                      ),
+                    ),
+                    title: Text(
+                      '$date 희망 리코딩',
+                      style: TextStyle(
+                        fontSize: 16, 
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? const Color(0xFF5C72EB) : const Color(0xFF1F1F1F)
+                      ),
+                    ),
+                    subtitle: Text(displayTime, style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                    trailing: isSelected 
+                      ? const Icon(Icons.check_circle, color: Color(0xFF5C72EB))
+                      : const Icon(Icons.play_arrow_rounded, color: Colors.grey),
+                    onTap: () {
+                      widget.onSelect(path, date);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressCirclePainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  _ProgressCirclePainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final strokeWidth = 3.0;
+
+    // 배경 원 (연한 회색)
+    final bgPaint = Paint()
+      ..color = Colors.grey[200]!
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius, bgPaint);
+
+    // 진행 원
+    if (progress > 0) {
+      final progressPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        2 * math.pi * progress,
+        false,
+        progressPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ProgressCirclePainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+

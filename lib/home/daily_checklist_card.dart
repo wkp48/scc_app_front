@@ -47,6 +47,8 @@ class DailyChecklistCardState extends State<DailyChecklistCard> {
   String _status = ""; // [Added]
   String _feedback = ""; // [Added]
 
+  int _refreshCount = 0; // [Added] To force refresh graph
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +70,7 @@ class DailyChecklistCardState extends State<DailyChecklistCard> {
     if (mounted) {
       setState(() {
         _isLoading = false;
+        _refreshCount++; // Increment on every success/fetch
         if (result['success'] == true) {
           final data = result['data'];
           _isSubmitted = data['submitted'] ?? false;
@@ -131,6 +134,10 @@ class DailyChecklistCardState extends State<DailyChecklistCard> {
     if (result == true) {
       if (widget.onChecklistCompleted != null) widget.onChecklistCompleted!();
       _fetchSummary();
+      // Additional explicit refresh for the graph
+      setState(() {
+         _refreshCount++;
+      });
     }
   }
 
@@ -224,6 +231,7 @@ class DailyChecklistCardState extends State<DailyChecklistCard> {
           // Adding a `bottomWidget` parameter to `ChecklistCollectionCard` seems best.
            bottomWidget: widget.showRecoveryTrend 
               ? RecoveryTrendCard(
+                  key: ValueKey('trend-$_refreshCount'), // [Updated] Force refresh
                   userData: widget.userData, 
                   isEmbedded: true,
                   checklistType: widget.checklistType, // [Modified] Pass type
@@ -303,6 +311,7 @@ class DailyChecklistCardState extends State<DailyChecklistCard> {
             if (widget.showRecoveryTrend) ...[
               const Divider(height: 1, color: Color(0xFFF0F0F0)),
               RecoveryTrendCard(
+                key: ValueKey('trend-not-$_refreshCount'), // [Updated] Force refresh
                 userData: widget.userData, 
                 isEmbedded: true,
                 checklistType: widget.checklistType, // [Modified] Pass type

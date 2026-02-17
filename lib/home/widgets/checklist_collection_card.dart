@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../daily_checklist_modal.dart';
+import '../../services/api_service.dart';
 
 class ChecklistCollectionCard extends StatefulWidget {
   final Map<String, double> scores;
@@ -523,7 +524,7 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
                    const SizedBox(height: 24),
                 ],
                 
-                // Details List removed as per request
+                // Removed redundant Activity Details List as requested
               ],
             ),
             crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
@@ -1076,7 +1077,6 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
                 ),
             ),
             // Manual Labels matching standard fl_chart order (Top, Right, Bottom, Left)
-            // Manual Labels
             ...List.generate(categories.length, (index) => buildLabel(index)),
           ],
         ),
@@ -1084,4 +1084,161 @@ class _ChecklistCollectionCardState extends State<ChecklistCollectionCard> {
     ],
   );
 }
+
+  String _getPreviewText(Map<String, dynamic> activity) {
+    final type = activity['activityType'];
+    String content = activity['content'] ?? '';
+    
+    if (type == 'GRATITUDE') {
+      final to = activity['gratitudeTo'] ?? '';
+      final situation = activity['gratitudeSituation'] ?? '';
+      final emotion = activity['gratitudeEmotion'] ?? '';
+      
+      List<String> parts = [];
+      if (to.isNotEmpty) parts.add('• 대상: $to');
+      if (situation.isNotEmpty) parts.add('• 상황: $situation');
+      if (emotion.isNotEmpty) parts.add('• 감정: $emotion');
+      
+      if (parts.isNotEmpty) return parts.join('\n');
+    } else if (type == 'IMPULSE') {
+      final situation = activity['impulseSituation'] ?? '';
+      final thought = activity['impulseThought'] ?? '';
+      final helpful = activity['impulseHelpful'] ?? '';
+      
+      List<String> parts = [];
+      if (situation.isNotEmpty) parts.add('• 상황: $situation');
+      if (thought.isNotEmpty) parts.add('• 생각: $thought');
+      if (helpful.isNotEmpty) parts.add('• 도움: $helpful');
+      
+      if (parts.isNotEmpty) return parts.join('\n');
+    } else if (type == 'EMOTION_DIARY' || type == 'ANXIETY_LOG') {
+      final situation = activity['situation'] ?? '';
+      final thought = activity['thought'] ?? '';
+      
+      List<String> parts = [];
+      if (situation.isNotEmpty) parts.add('• 상황: $situation');
+      if (thought.isNotEmpty) parts.add('• 생각: $thought');
+      
+      if (parts.isNotEmpty) return parts.join('\n');
+    } else if (type == 'WALK') {
+      return content.isEmpty ? '일상 기록 내용이 없습니다.' : content;
+    }
+    
+    return content.isEmpty ? '내용 없음' : content;
+  }
+
+  Widget _buildSummaryActivityCard(Map<String, dynamic> activity) {
+    final type = activity['activityType'];
+    final content = activity['content'] ?? '';
+    final imageUrls = activity['imageUrls'] as List<dynamic>? ?? [];
+    final startTime = activity['startTime'];
+
+    IconData icon;
+    Color color;
+    String label;
+
+    switch (type) {
+      case 'GRATITUDE':
+        icon = Icons.favorite_border;
+        color = const Color(0xFFFF851B);
+        label = '감사 일기';
+        break;
+      case 'WALK':
+        icon = Icons.wb_sunny_outlined;
+        color = const Color(0xFF52C41A);
+        label = '일상 기록';
+        break;
+      case 'IMPULSE':
+        icon = Icons.flash_on;
+        color = const Color(0xFFFF4D4F);
+        label = '충동 일지';
+        break;
+      case 'POSITIVE_SELF':
+        icon = Icons.auto_awesome;
+        color = const Color(0xFF722ED1);
+        label = '희망 리코딩';
+        break;
+      default:
+        icon = Icons.edit_note_rounded;
+        color = Colors.blueGrey;
+        label = '활동 기록';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border(left: BorderSide(color: color, width: 4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+                child: Icon(icon, color: color, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+              const Spacer(),
+              if (startTime != null)
+                Text(
+                  startTime.toString().substring(0, 5),
+                  style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (imageUrls.isNotEmpty)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FutureBuilder<String>(
+                  future: ApiService.baseUrl,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return Container(width: 60, height: 60, decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)));
+                    }
+                    final baseUrl = snapshot.data!;
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        ApiService.getAbsoluteUrl(baseUrl, imageUrls.first),
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        headers: {'X-User-Uid': (widget.userData?['uid'] ?? '').toString()},
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 60,
+                          height: 60,
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
+                        ),
+                      ),
+                    );
+                  }
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _getPreviewText(activity),
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF434343), height: 1.4),
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            )
+          else
+            Text(
+              _getPreviewText(activity),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF434343), height: 1.4),
+            ),
+        ],
+      ),
+    );
+  }
 }

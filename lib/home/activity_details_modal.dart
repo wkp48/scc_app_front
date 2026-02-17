@@ -36,7 +36,7 @@ class ActivityDetailsModal extends StatefulWidget {
 }
 
 class _ActivityDetailsModalState extends State<ActivityDetailsModal> {
-  bool _isAllView = false;
+  bool _isAllView = true;
   late DateTime _selectedDate;
   List<dynamic> _activities = [];
   bool _isLoading = true;
@@ -71,23 +71,8 @@ class _ActivityDetailsModalState extends State<ActivityDetailsModal> {
     }
   }
 
-  String _getAbsoluteUrl(String path) {
-    if (path.isEmpty) return '';
-    if (path.startsWith('data:image')) return path;
-    if (path.startsWith('http')) return path;
-    
-    // 기본 베이스 URL
-    const String effectiveBaseUrl = 'http://192.168.0.75:8900/api';
-    
-    String url;
-    if (path.startsWith('/api')) {
-      url = effectiveBaseUrl.substring(0, effectiveBaseUrl.length - 4) + path;
-    } else if (!path.startsWith('/')) {
-      url = '$effectiveBaseUrl/$path';
-    } else {
-      url = '$effectiveBaseUrl$path';
-    }
-    return Uri.encodeFull(url);
+  String _getAbsoluteUrl(String path, String baseUrl) {
+    return ApiService.getAbsoluteUrl(baseUrl, path);
   }
 
   void _nextDate() {
@@ -128,8 +113,6 @@ class _ActivityDetailsModalState extends State<ActivityDetailsModal> {
         children: [
           _buildHeader(),
           const SizedBox(height: 16),
-          _buildToggleButtons(),
-          if (!_isAllView) _buildDateNavigation(),
           Expanded(
             child: widget.activityType == 'ALL' && _isLoading 
                 ? const Center(child: CircularProgressIndicator())
@@ -308,6 +291,48 @@ class _ActivityDetailsModalState extends State<ActivityDetailsModal> {
     );
   }
 
+  String _getPreviewText(Map<String, dynamic> activity) {
+    final type = activity['activityType'];
+    String content = activity['content'] ?? '';
+    
+    if (type == 'GRATITUDE') {
+      final to = activity['gratitudeTo'] ?? '';
+      final situation = activity['gratitudeSituation'] ?? '';
+      final emotion = activity['gratitudeEmotion'] ?? '';
+      
+      List<String> parts = [];
+      if (to.isNotEmpty) parts.add('• 대상: $to');
+      if (situation.isNotEmpty) parts.add('• 상황: $situation');
+      if (emotion.isNotEmpty) parts.add('• 감정: $emotion');
+      
+      if (parts.isNotEmpty) return parts.join('\n');
+    } else if (type == 'IMPULSE') {
+      final situation = activity['impulseSituation'] ?? '';
+      final thought = activity['impulseThought'] ?? '';
+      final helpful = activity['impulseHelpful'] ?? '';
+      
+      List<String> parts = [];
+      if (situation.isNotEmpty) parts.add('• 상황: $situation');
+      if (thought.isNotEmpty) parts.add('• 생각: $thought');
+      if (helpful.isNotEmpty) parts.add('• 도움: $helpful');
+      
+      if (parts.isNotEmpty) return parts.join('\n');
+    } else if (type == 'EMOTION_DIARY' || type == 'ANXIETY_LOG') {
+      final situation = activity['situation'] ?? '';
+      final thought = activity['thought'] ?? '';
+      
+      List<String> parts = [];
+      if (situation.isNotEmpty) parts.add('• 상황: $situation');
+      if (thought.isNotEmpty) parts.add('• 생각: $thought');
+      
+      if (parts.isNotEmpty) return parts.join('\n');
+    } else if (type == 'WALK') {
+      return content.isEmpty ? '일상 기록 내용이 없습니다.' : content;
+    }
+    
+    return content.isEmpty ? '내용 없음' : content;
+  }
+
   Widget _buildActivityCard(dynamic activity) {
     final List<dynamic> imageUrls = activity['imageUrls'] ?? [];
     
@@ -389,26 +414,54 @@ class _ActivityDetailsModalState extends State<ActivityDetailsModal> {
               Container(
                 height: 120,
                 margin: const EdgeInsets.only(bottom: 12),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: imageUrls.length,
-                  itemBuilder: (context, idx) {
-                    return Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      width: 120,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        image: DecorationImage(
-                          image: NetworkImage(_getAbsoluteUrl(imageUrls[idx])),
-                          fit: BoxFit.cover,
+                child: FutureBuilder<String>(
+                  future: ApiService.baseUrl,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: imageUrls.length,
+                        itemBuilder: (context, idx) => Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          width: 120,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ),
+                      );
+                    }
+                    final baseUrl = snapshot.data!;
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: imageUrls.length,
+                      itemBuilder: (context, idx) {
+                        return Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          width: 120,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              _getAbsoluteUrl(imageUrls[idx], baseUrl),
+                              fit: BoxFit.cover,
+                              headers: {'X-User-Uid': widget.userData['uid'] ?? ''},
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.broken_image, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     );
-                  },
+                  }
                 ),
               ),
-            Text(activity['content'] ?? '', 
-              maxLines: 3,
+            Text(_getPreviewText(activity), 
+              maxLines: 4,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.5)
             ),

@@ -83,6 +83,7 @@ class _ActivityRecordModalState extends State<ActivityRecordModal> {
   final Set<String> _selectedEmotions = {};
 
   String? _voiceFilePath;
+  String? _voiceDuration;
 
   // 추가 필드
   String? _selectedCategory;
@@ -165,22 +166,8 @@ class _ActivityRecordModalState extends State<ActivityRecordModal> {
     }
   }
 
-  String _getAbsoluteUrl(String path) {
-    if (path.isEmpty) return '';
-    if (path.startsWith('data:image')) return path;
-    if (path.startsWith('http')) return path;
-    
-    const String effectiveBaseUrl = 'http://192.168.0.75:8900/api';
-    
-    String url;
-    if (path.startsWith('/api')) {
-      url = effectiveBaseUrl.substring(0, effectiveBaseUrl.length - 4) + path;
-    } else if (!path.startsWith('/')) {
-      url = '$effectiveBaseUrl/$path';
-    } else {
-      url = '$effectiveBaseUrl$path';
-    }
-    return Uri.encodeFull(url);
+  String _getAbsoluteUrl(String path, String baseUrl) {
+    return ApiService.getAbsoluteUrl(baseUrl, path);
   }
 
   Widget _buildTitleInput({bool readOnly = false, String? initialValue}) {
@@ -297,6 +284,10 @@ class _ActivityRecordModalState extends State<ActivityRecordModal> {
           } else {
              final now = DateTime.now();
              startTimeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:00';
+             
+             if (type == 'POSITIVE_SELF' && _voiceDuration != null) {
+               endTimeStr = _voiceDuration;
+             }
           }
       }
 
@@ -893,11 +884,31 @@ class _ActivityRecordModalState extends State<ActivityRecordModal> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          _getAbsoluteUrl(_existingImageUrls[index]),
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
+                        child: FutureBuilder<String>(
+                          future: ApiService.baseUrl,
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return Container(
+                                width: 100,
+                                height: 100,
+                                color: Colors.grey[100],
+                              );
+                            }
+                            final baseUrl = snapshot.data!;
+                            return Image.network(
+                              _getAbsoluteUrl(_existingImageUrls[index], baseUrl),
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                              headers: {'X-User-Uid': widget.userData['uid'] ?? ''},
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                width: 100,
+                                height: 100,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.broken_image, color: Colors.grey),
+                              ),
+                            );
+                          }
                         ),
                       ),
                       Positioned(
@@ -1014,9 +1025,10 @@ class _ActivityRecordModalState extends State<ActivityRecordModal> {
                         context,
                         MaterialPageRoute(builder: (context) => const VoiceRecordScreen()),
                       );
-                      if (result != null && result is String) {
+                      if (result != null && result is Map) {
                         setState(() {
-                          _voiceFilePath = result;
+                          _voiceFilePath = result['path'];
+                          _voiceDuration = result['duration'];
                         });
                       }
                     },

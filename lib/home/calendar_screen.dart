@@ -1561,7 +1561,8 @@ class CalendarScreenState extends State<CalendarScreen> with SingleTickerProvide
                           ),
                         );
                       }
-                      String finalUrl = snapshot.data!.replaceAll('/api', '') + imageUrls.first;
+                      final baseUrl = snapshot.data!;
+                      String finalUrl = ApiService.getAbsoluteUrl(baseUrl, imageUrls.first);
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.network(
@@ -1569,7 +1570,7 @@ class CalendarScreenState extends State<CalendarScreen> with SingleTickerProvide
                           width: 80,
                           height: 80,
                           fit: BoxFit.cover,
-                          headers: {'X-User-Uid': widget.userData!['uid']},
+                          headers: {'X-User-Uid': widget.userData!['uid'] ?? ''},
                           errorBuilder: (context, error, stackTrace) => Container(
                             width: 80,
                             height: 80,

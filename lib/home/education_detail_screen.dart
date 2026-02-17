@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'video_player_screen.dart';
 
-class EducationDetailScreen extends StatelessWidget {
+class EducationDetailScreen extends StatefulWidget {
   final String title;
+  final String? summary; // [Added] Summary text for toggle
   final List<String> descriptionPoints;
   final String videoCategory;
   final List<dynamic> allVideos;
@@ -11,25 +12,40 @@ class EducationDetailScreen extends StatelessWidget {
   const EducationDetailScreen({
     super.key,
     required this.title,
+    this.summary,
     required this.descriptionPoints,
     required this.videoCategory,
     required this.allVideos,
   });
 
   @override
+  State<EducationDetailScreen> createState() => _EducationDetailScreenState();
+}
+
+class _EducationDetailScreenState extends State<EducationDetailScreen> {
+  bool _isExpanded = false; // [Added] Toggle state
+
+  @override
+  void initState() {
+    super.initState();
+    // If no summary is provided, always show description points
+    if (widget.summary == null || widget.summary!.isEmpty) {
+      _isExpanded = true;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-   
-    
-    final List<dynamic> relatedVideos = allVideos.where((video) {
+    final List<dynamic> relatedVideos = widget.allVideos.where((video) {
         final String? cat = video['category'];
         if (cat != null && cat.isNotEmpty) {
-            return cat == videoCategory;
+            return cat == widget.videoCategory;
         }
        
         final String title = (video['title'] ?? '').toString();
-        if (videoCategory == 'UNDERSTANDING' && title.contains('도박')) return true;
-        if (videoCategory == 'IMPULSE' && (title.contains('충동') || title.contains('호흡'))) return true;
-        if (videoCategory == 'COMMUNICATION' && title.contains('대화')) return true;
+        if (widget.videoCategory == 'UNDERSTANDING' && title.contains('도박')) return true;
+        if (widget.videoCategory == 'IMPULSE' && (title.contains('충동') || title.contains('호흡'))) return true;
+        if (widget.videoCategory == 'COMMUNICATION' && title.contains('대화')) return true;
         
         return false;
     }).toList();
@@ -37,7 +53,7 @@ class EducationDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text(widget.title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -51,37 +67,72 @@ class EducationDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Description Section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F8FA),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: descriptionPoints.map((point) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(top: 6),
-                          child: Icon(Icons.circle, size: 6, color: Color(0xFF5C72EB)),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            point,
-                            style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563), height: 1.5),
+            GestureDetector(
+              onTap: () {
+                if (!_isExpanded) {
+                  setState(() => _isExpanded = true);
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8FA),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!_isExpanded && widget.summary != null) ...[
+                      // Summary Mode
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.summary!,
+                              style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563), height: 1.5),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '+ 더보기',
+                            style: TextStyle(
+                              color: Color(0xFF5C72EB),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      // Detailed Mode (Points)
+                      ...widget.descriptionPoints.map((point) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(top: 6),
+                                child: Icon(Icons.circle, size: 6, color: Color(0xFF5C72EB)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  point,
+                                  style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563), height: 1.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      // Optionally add a "Show Less" or just keep it expanded
+                    ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 32),
